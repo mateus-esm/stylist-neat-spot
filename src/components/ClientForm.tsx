@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -40,8 +40,8 @@ const ClientForm = ({ open, onOpenChange, onSuccess, client }: ClientFormProps) 
     }
   }, [open, client]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!user) return;
     setLoading(true);
 
@@ -57,11 +57,11 @@ const ClientForm = ({ open, onOpenChange, onSuccess, client }: ClientFormProps) 
     if (client) {
       const { error } = await supabase.from("clients").update(data).eq("id", client.id);
       if (error) toast({ title: "Erro", description: error.message, variant: "destructive" });
-      else toast({ title: "Cliente atualizado!" });
+      else toast({ title: "Paciente atualizado" });
     } else {
       const { error } = await supabase.from("clients").insert(data);
       if (error) toast({ title: "Erro", description: error.message, variant: "destructive" });
-      else toast({ title: "Cliente cadastrado!" });
+      else toast({ title: "Paciente cadastrado" });
     }
 
     setLoading(false);
@@ -71,32 +71,37 @@ const ClientForm = ({ open, onOpenChange, onSuccess, client }: ClientFormProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm rounded-sm">
         <DialogHeader>
-          <DialogTitle>{client ? "Editar Cliente" : "Novo Cliente"}</DialogTitle>
+          <DialogTitle>{client ? "Editar paciente" : "Novo paciente"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>Nome *</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} required />
+            <Input value={name} onChange={(event) => setName(event.target.value)} required className="rounded-sm" />
           </div>
           <div className="space-y-2">
             <Label>Telefone</Label>
-            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 99999-9999" />
+            <Input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="(11) 99999-9999" className="rounded-sm" />
           </div>
           <div className="space-y-2">
             <Label>Instagram</Label>
-            <Input value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@usuario" />
+            <Input value={instagram} onChange={(event) => setInstagram(event.target.value)} placeholder="@usuario" className="rounded-sm" />
           </div>
           <div className="space-y-2">
-            <Label>Observações</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex: gosta de degradê baixo" />
+            <Label>Observacoes operacionais</Label>
+            <Textarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Restricoes, preferencias de horario ou alerta administrativo"
+              className="rounded-sm"
+            />
           </div>
           <div className="space-y-2">
-            <Label>Frequência de retorno (dias)</Label>
-            <Input type="number" min="1" value={returnDays} onChange={(e) => setReturnDays(e.target.value)} />
+            <Label>Janela de retorno clinico (dias)</Label>
+            <Input type="number" min="1" value={returnDays} onChange={(event) => setReturnDays(event.target.value)} className="rounded-sm" />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full rounded-sm" disabled={loading}>
             {loading ? "Salvando..." : client ? "Salvar" : "Cadastrar"}
           </Button>
         </form>

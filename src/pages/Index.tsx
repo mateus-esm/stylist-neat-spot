@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Plus, ChevronLeft, ChevronRight, LogOut, DollarSign, Clock } from "lucide-react";
 import AppointmentForm from "@/components/AppointmentForm";
 import AppointmentSheet from "@/components/AppointmentSheet";
-import ServiceLogSheet from "@/components/ServiceLogSheet";
+import EvolutionSheet from "@/components/EvolutionSheet";
 import { BrandLogo } from "@/components/BrandLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
@@ -183,7 +183,7 @@ const Index = () => {
         onRefresh={fetchAppointments}
       />
 
-      <ServiceLogSheet
+      <EvolutionSheet
         open={logOpen}
         onOpenChange={setLogOpen}
         appointment={selected}
@@ -263,7 +263,7 @@ const DayView = ({ date, appointments, onSelect }: any) => {
                         : "border-border bg-background text-muted-foreground"
                     )}
                   >
-                    {isPkg ? `Sessão ${a.package_session_index ?? "·"}${a.package_total ? ` de ${a.package_total}` : ""}` : "Avulso"}
+                    {isPkg ? `Sessao ${a.package_session_index ?? "-"}${a.package_total ? ` de ${a.package_total}` : ""}` : "Avulso"}
                   </span>
                 </div>
               </button>
@@ -302,20 +302,31 @@ const WeekView = ({ startDate, appointments, onSelect }: any) => {
                 <p className="py-2 text-xs text-muted-foreground/60">Sem agendamentos</p>
               ) : (
                 <div className="space-y-1.5">
-                  {list.map((a: any) => (
-                    <button
-                      key={a.id}
-                      onClick={() => onSelect(a)}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-md border-l-4 bg-secondary/40 px-2 py-1.5 text-left text-xs transition-colors hover:bg-secondary/70",
-                        statusBg[a.status]
-                      )}
-                    >
-                      <span className="font-semibold tabular-nums">{a.appointment_time?.slice(0, 5)}</span>
-                      <span className="flex-1 truncate">{a.client_name}</span>
-                      <span className="text-muted-foreground">{a.service}</span>
-                    </button>
-                  ))}
+                  {list.map((a: any) => {
+                    const isPkg = !!(a.package_id || a.package_session_index);
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => onSelect(a)}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-sm border-l-4 bg-secondary/40 px-2 py-1.5 text-left text-xs transition-colors hover:bg-secondary/70",
+                          statusBg[a.status]
+                        )}
+                      >
+                        <span className="font-semibold tabular-nums">{a.appointment_time?.slice(0, 5)}</span>
+                        <span className="flex-1 truncate">{a.client_name}</span>
+                        <span className="truncate text-muted-foreground">{a.service}</span>
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-sm border px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider",
+                            isPkg ? "border-foreground bg-foreground text-background" : "border-border bg-background text-muted-foreground"
+                          )}
+                        >
+                          {isPkg ? `Sessao ${a.package_session_index ?? "-"}${a.package_total ? `/${a.package_total}` : ""}` : "Avulso"}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
