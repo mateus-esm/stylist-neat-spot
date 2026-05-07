@@ -2,103 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
-
-@font-face {
-  font-family: 'Neue Montreal';
-  src: url('./assets/fonts/NeueMontreal-Light.otf') format('opentype');
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @layer base {
   :root {
-    /* Duda Hair APP — Light theme (sober, low saturation) */
-    --background: 30 8% 97%;
-    --foreground: 20 10% 12%;
+    /* Lucas Rocha Fisio APP — McKinsey-inspired. Stark contrast, single accent. */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 8%;
 
     --card: 0 0% 100%;
-    --card-foreground: 20 10% 12%;
+    --card-foreground: 0 0% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 20 10% 12%;
+    --popover-foreground: 0 0% 8%;
 
-    --primary: 18 70% 50%;            /* desaturated #FF481E */
+    /* Sport red accent — used sparingly */
+    --primary: 358 78% 48%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 38 70% 55%;       /* desaturated yellow-orange */
+    --primary-glow: 358 78% 48%;
 
-    --secondary: 30 6% 93%;
-    --secondary-foreground: 20 10% 12%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 8%;
 
-    --muted: 30 6% 94%;
-    --muted-foreground: 20 5% 42%;
+    --muted: 0 0% 97%;
+    --muted-foreground: 0 0% 38%;
 
-    --accent: 38 60% 55%;
-    --accent-foreground: 20 10% 12%;
+    --accent: 358 78% 48%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 60% 50%;
+    --destructive: 0 75% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 145 40% 40%;
+    --success: 152 55% 32%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 35 70% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 38 92% 45%;
+    --warning-foreground: 0 0% 8%;
 
-    --border: 30 6% 88%;
-    --input: 30 6% 92%;
-    --ring: 18 70% 50%;
+    --border: 0 0% 90%;
+    --input: 0 0% 94%;
+    --ring: 358 78% 48%;
 
-    --radius: 0.875rem;
+    --radius: 0.25rem;
 
-    --gradient-brand: linear-gradient(90deg, hsl(18 70% 50%) 0%, hsl(28 65% 52%) 50%, hsl(38 70% 55%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(30 8% 97%));
-    --shadow-brand: 0 8px 24px -10px hsl(18 70% 50% / 0.25);
-    --shadow-elevated: 0 4px 20px -8px hsl(20 10% 12% / 0.12);
+    /* Flat. No gradients. Aliases kept for backward compatibility. */
+    --gradient-brand: hsl(358 78% 48%);
+    --gradient-card: hsl(0 0% 100%);
+    --shadow-brand: 0 1px 0 0 hsl(358 78% 48% / 0.0);
+    --shadow-elevated: 0 1px 2px 0 hsl(0 0% 0% / 0.04), 0 1px 3px 0 hsl(0 0% 0% / 0.06);
   }
 
   .dark {
-    /* Dark theme — sober #141414 */
-    --background: 0 0% 8%;
-    --foreground: 30 6% 92%;
+    --background: 0 0% 7%;
+    --foreground: 0 0% 96%;
 
-    --card: 0 0% 11%;
-    --card-foreground: 30 6% 92%;
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 96%;
 
-    --popover: 0 0% 11%;
-    --popover-foreground: 30 6% 92%;
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 96%;
 
-    --primary: 18 65% 55%;
+    --primary: 358 78% 54%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 38 60% 58%;
+    --primary-glow: 358 78% 54%;
 
-    --secondary: 0 0% 14%;
-    --secondary-foreground: 30 6% 92%;
+    --secondary: 0 0% 13%;
+    --secondary-foreground: 0 0% 96%;
 
-    --muted: 0 0% 13%;
-    --muted-foreground: 30 4% 60%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 62%;
 
-    --accent: 38 55% 55%;
-    --accent-foreground: 0 0% 8%;
+    --accent: 358 78% 54%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 55% 50%;
-    --destructive-foreground: 30 6% 92%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 145 35% 45%;
-    --success-foreground: 30 6% 92%;
+    --success: 152 50% 42%;
+    --success-foreground: 0 0% 100%;
 
-    --warning: 35 65% 55%;
+    --warning: 38 85% 55%;
     --warning-foreground: 0 0% 8%;
 
-    --border: 0 0% 17%;
+    --border: 0 0% 18%;
     --input: 0 0% 15%;
-    --ring: 18 65% 55%;
+    --ring: 358 78% 54%;
 
-    --gradient-brand: linear-gradient(90deg, hsl(18 65% 55%) 0%, hsl(28 60% 55%) 50%, hsl(38 60% 58%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 13%), hsl(0 0% 9%));
-    --shadow-brand: 0 10px 32px -14px hsl(18 65% 55% / 0.35);
-    --shadow-elevated: 0 8px 24px -10px hsl(0 0% 0% / 0.5);
+    --gradient-brand: hsl(358 78% 54%);
+    --gradient-card: hsl(0 0% 9%);
+    --shadow-brand: 0 0 0 0 transparent;
+    --shadow-elevated: 0 1px 2px 0 hsl(0 0% 0% / 0.4);
   }
 }
 
@@ -109,32 +102,44 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Neue Montreal', 'Inter', system-ui, sans-serif;
-    font-weight: 300;
+    font-family: 'Inter', system-ui, sans-serif;
     font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Neue Montreal', 'Space Grotesk', sans-serif;
-    letter-spacing: -0.02em;
-    font-weight: 400;
+    font-family: 'IBM Plex Sans', 'Inter', sans-serif;
+    letter-spacing: -0.015em;
+    font-weight: 500;
+  }
+
+  .font-mono, .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }
 
 @layer utilities {
+  /* Flat utilities — kept as aliases so existing classes resolve, but no longer gradients. */
   .text-gradient-brand {
-    background: var(--gradient-brand);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: hsl(var(--primary));
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
   }
   .bg-gradient-brand {
-    background: var(--gradient-brand);
+    background: hsl(var(--primary));
   }
   .shadow-brand {
     box-shadow: var(--shadow-brand);
   }
   .shadow-elevated {
     box-shadow: var(--shadow-elevated);
+  }
+  .font-display {
+    font-family: 'IBM Plex Sans', 'Inter', sans-serif;
+    letter-spacing: -0.02em;
+  }
+  .font-mono-data {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
   }
 }
