@@ -59,7 +59,7 @@ const Returns = () => {
   };
 
   const message = (name: string) =>
-    `Olá ${name}! Faz um tempo desde seu último corte. Que tal agendar? ✂️ — Duda Hair`;
+    `Olá ${name}! Identificamos que você está há um tempo sem sessão. Vamos retomar seu protocolo de reabilitação? — Lucas Rocha Fisio`;
 
   const openWhatsApp = (phone: string, name: string) => {
     const clean = phone.replace(/\D/g, "");

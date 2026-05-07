@@ -52,10 +52,10 @@ const Auth = () => {
           <CardContent className="p-6">
             <div className="mb-5 space-y-1">
               <h1 className="text-xl font-semibold">
-                {isLogin ? "Entrar no estúdio" : "Criar conta"}
+                {isLogin ? "Acesso à clínica" : "Criar acesso"}
               </h1>
               <p className="text-sm text-muted-foreground">
-                {isLogin ? "Acesse seu painel de comando." : "Comece a organizar sua agenda."}
+                {isLogin ? "Entre no Command Center clínico." : "Configure seu acesso ao sistema."}
               </p>
             </div>
 

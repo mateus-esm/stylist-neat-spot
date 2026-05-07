@@ -124,15 +124,15 @@ const Index = () => {
             </div>
 
             {/* View toggle */}
-            <div className="flex rounded-full border border-border bg-card p-0.5">
+            <div className="flex rounded-sm border border-border bg-card p-0.5">
               {(["day", "week", "month"] as View[]).map((v) => (
                 <button
                   key={v}
                   onClick={() => setView(v)}
                   className={cn(
-                    "rounded-full px-3 py-1 text-xs font-medium transition-all",
+                    "rounded-sm px-3 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors",
                     view === v
-                      ? "bg-gradient-brand text-primary-foreground shadow-sm"
+                      ? "bg-foreground text-background"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -237,22 +237,35 @@ const DayView = ({ date, appointments, onSelect }: any) => {
         <div className="absolute inset-y-0 left-12 right-1">
           {dayAppts.map((a: any) => {
             const s = apptStyle(a);
+            const isPkg = !!(a.package_id || a.package_session_index);
             return (
               <button
                 key={a.id}
                 onClick={() => onSelect(a)}
                 className={cn(
-                  "absolute left-0 right-0 overflow-hidden rounded-lg border-l-4 px-3 py-2 text-left transition-all hover:scale-[1.01] hover:shadow-elevated",
+                  "absolute left-0 right-0 overflow-hidden rounded-sm border-l-[3px] px-3 py-2 text-left transition-colors hover:bg-secondary",
                   statusBg[a.status]
                 )}
                 style={{ top: s.top, height: s.height }}
               >
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span>{a.appointment_time?.slice(0, 5)}</span>
-                  <span className="text-primary">R$ {Number(a.price).toFixed(0)}</span>
+                <div className="flex items-center justify-between text-[11px] font-mono-data">
+                  <span className="font-semibold tabular-nums">{a.appointment_time?.slice(0, 5)}</span>
+                  <span className="font-semibold tabular-nums">R$ {Number(a.price).toFixed(0)}</span>
                 </div>
                 <p className="truncate text-sm font-medium">{a.client_name}</p>
-                <p className="truncate text-[11px] text-muted-foreground">{a.service}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-[11px] text-muted-foreground">{a.service}</p>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-sm border px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider",
+                      isPkg
+                        ? "border-foreground/70 bg-foreground text-background"
+                        : "border-border bg-background text-muted-foreground"
+                    )}
+                  >
+                    {isPkg ? `Sessão ${a.package_session_index ?? "·"}${a.package_total ? ` de ${a.package_total}` : ""}` : "Avulso"}
+                  </span>
+                </div>
               </button>
             );
           })}

@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Clients from "./pages/Clients";
+// /clientes is kept as an alias of /pacientes for backward compat
 import Returns from "./pages/Returns";
 import Financial from "./pages/Financial";
 import Auth from "./pages/Auth";
@@ -50,7 +51,8 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
             <Route path="/" element={<ProtectedRoute><AppLayout><Index /></AppLayout></ProtectedRoute>} />
-            <Route path="/clientes" element={<ProtectedRoute><AppLayout><Clients /></AppLayout></ProtectedRoute>} />
+            <Route path="/pacientes" element={<ProtectedRoute><AppLayout><Clients /></AppLayout></ProtectedRoute>} />
+            <Route path="/clientes" element={<Navigate to="/pacientes" replace />} />
             <Route path="/retornos" element={<ProtectedRoute><AppLayout><Returns /></AppLayout></ProtectedRoute>} />
             <Route path="/financeiro" element={<ProtectedRoute><AppLayout><Financial /></AppLayout></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
