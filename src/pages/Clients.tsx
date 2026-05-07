@@ -71,12 +71,12 @@ const Clients = () => {
         <div className="mx-auto max-w-3xl space-y-3">
           <div className="flex items-center justify-between">
             <BrandLogo size="sm" />
-            <Badge variant="outline" className="text-xs">{clients.length} clientes</Badge>
+            <Badge variant="outline" className="rounded-sm text-[10px] uppercase tracking-wider">{clients.length} pacientes</Badge>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar cliente..."
+              placeholder="Buscar paciente..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 bg-card"
@@ -89,7 +89,7 @@ const Clients = () => {
         {clients.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="py-10 text-center text-muted-foreground">
-              <p className="text-sm">Nenhum cliente cadastrado</p>
+              <p className="text-sm">Nenhum paciente cadastrado</p>
             </CardContent>
           </Card>
         ) : (
@@ -117,7 +117,7 @@ const Clients = () => {
                       <Star className="h-3.5 w-3.5 fill-accent text-accent" />
                       {st.total}
                     </div>
-                    <p className="text-[10px] text-muted-foreground">visitas</p>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">sessões</p>
                   </div>
                   {isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                 </button>

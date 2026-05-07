@@ -54,7 +54,7 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
     if (!phone) return toast.error("Cliente sem telefone");
     const fullPhone = phone.startsWith("55") ? phone : `55${phone}`;
     const msg = encodeURIComponent(
-      `Olá ${appointment.client_name}! Confirmando seu horário às ${appointment.appointment_time?.slice(0, 5)} no dia ${format(new Date(appointment.appointment_date + "T12:00:00"), "dd/MM")}. ✂️`
+      `Olá ${appointment.client_name}! Confirmando sua sessão às ${appointment.appointment_time?.slice(0, 5)} no dia ${format(new Date(appointment.appointment_date + "T12:00:00"), "dd/MM")}. — Lucas Rocha Fisio`
     );
     window.open(`https://wa.me/${fullPhone}?text=${msg}`, "_blank");
   };
