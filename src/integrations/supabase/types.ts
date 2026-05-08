@@ -22,8 +22,14 @@ export type Database = {
           client_name: string
           created_at: string
           duration_min: number | null
+          evolution_notes: string | null
           id: string
+          media_url: string | null
           observations: string | null
+          package_id: string | null
+          package_session_index: number | null
+          package_total: number | null
+          pain_scale: number | null
           payment_status: string
           photo_url: string | null
           price: number
@@ -40,8 +46,14 @@ export type Database = {
           client_name: string
           created_at?: string
           duration_min?: number | null
+          evolution_notes?: string | null
           id?: string
+          media_url?: string | null
           observations?: string | null
+          package_id?: string | null
+          package_session_index?: number | null
+          package_total?: number | null
+          pain_scale?: number | null
           payment_status?: string
           photo_url?: string | null
           price?: number
@@ -58,8 +70,14 @@ export type Database = {
           client_name?: string
           created_at?: string
           duration_min?: number | null
+          evolution_notes?: string | null
           id?: string
+          media_url?: string | null
           observations?: string | null
+          package_id?: string | null
+          package_session_index?: number | null
+          package_total?: number | null
+          pain_scale?: number | null
           payment_status?: string
           photo_url?: string | null
           price?: number
@@ -77,43 +95,118 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "appointments_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "patient_packages"
+            referencedColumns: ["id"]
+          },
         ]
       }
       clients: {
         Row: {
           created_at: string
+          health_history: string | null
           id: string
           instagram: string | null
           name: string
           notes: string | null
+          past_surgeries: string | null
           phone: string | null
+          primary_complaints: string | null
           return_days: number | null
+          underlying_conditions: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          health_history?: string | null
           id?: string
           instagram?: string | null
           name: string
           notes?: string | null
+          past_surgeries?: string | null
           phone?: string | null
+          primary_complaints?: string | null
           return_days?: number | null
+          underlying_conditions?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          health_history?: string | null
           id?: string
           instagram?: string | null
           name?: string
           notes?: string | null
+          past_surgeries?: string | null
           phone?: string | null
+          primary_complaints?: string | null
           return_days?: number | null
+          underlying_conditions?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      patient_packages: {
+        Row: {
+          client_id: string
+          completed_sessions: number
+          created_at: string
+          finished_at: string | null
+          id: string
+          name: string
+          payment_status: string
+          price: number
+          started_at: string | null
+          status: string
+          total_sessions: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          completed_sessions?: number
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          name: string
+          payment_status?: string
+          price?: number
+          started_at?: string | null
+          status?: string
+          total_sessions?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          completed_sessions?: number
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          name?: string
+          payment_status?: string
+          price?: number
+          started_at?: string | null
+          status?: string
+          total_sessions?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_packages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
