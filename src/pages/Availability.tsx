@@ -120,7 +120,7 @@ const Availability = () => {
         {Object.keys(grouped).length === 0 ? (
           <Card className="rounded-sm border-dashed"><CardContent className="py-10 text-center text-sm text-muted-foreground">Sem horarios cadastrados.</CardContent></Card>
         ) : (
-          Object.entries(grouped).map(([day, daySlots]) => (
+          (Object.entries(grouped) as [string, any[]][]).map(([day, daySlots]) => (
             <div key={day} className="space-y-2">
               <p className="text-xs uppercase tracking-wider text-muted-foreground">
                 {format(new Date(day + "T12:00:00"), "EEEE, dd 'de' MMMM", { locale: ptBR })}
