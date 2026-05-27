@@ -104,8 +104,48 @@ export type Database = {
           },
         ]
       }
+      availability_slots: {
+        Row: {
+          appointment_id: string | null
+          created_at: string
+          end_time: string
+          id: string
+          reason: string | null
+          slot_date: string
+          start_time: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string
+          end_time: string
+          id?: string
+          reason?: string | null
+          slot_date: string
+          start_time: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string
+          end_time?: string
+          id?: string
+          reason?: string | null
+          slot_date?: string
+          start_time?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
+          auth_user_id: string | null
           created_at: string
           health_history: string | null
           id: string
@@ -121,6 +161,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          auth_user_id?: string | null
           created_at?: string
           health_history?: string | null
           id?: string
@@ -136,6 +177,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          auth_user_id?: string | null
           created_at?: string
           health_history?: string | null
           id?: string
@@ -208,15 +250,91 @@ export type Database = {
           },
         ]
       }
+      session_exercises: {
+        Row: {
+          appointment_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          load: string | null
+          name: string
+          notes: string | null
+          order_index: number
+          reps: string | null
+          rest_seconds: number | null
+          sets: number | null
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          appointment_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          load?: string | null
+          name: string
+          notes?: string | null
+          order_index?: number
+          reps?: string | null
+          rest_seconds?: number | null
+          sets?: number | null
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          appointment_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          load?: string | null
+          name?: string
+          notes?: string | null
+          order_index?: number
+          reps?: string | null
+          rest_seconds?: number | null
+          sets?: number | null
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      current_patient_client_id: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "patient"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -343,6 +461,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "patient"],
+    },
   },
 } as const
