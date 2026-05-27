@@ -258,6 +258,10 @@ const Patients = () => {
                       <Edit3 className="h-4 w-4" />
                     </Button>
                   </div>
+                </div>
+              </SheetHeader>
+
+
 
               <Tabs defaultValue="anamnesis" className="mt-6">
                 <TabsList className="grid w-full grid-cols-3 rounded-sm">
