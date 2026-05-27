@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Phone, Edit3, ClipboardList, Activity, PackagePlus, Loader2 } from "lucide-react";
+import { Plus, Search, Phone, Edit3, ClipboardList, Activity, PackagePlus, Loader2, Mail, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import ClientForm from "@/components/ClientForm";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -228,19 +228,36 @@ const Patients = () => {
                       Prontuario clinico, pacotes ativos e linha do tempo de evolucoes.
                     </SheetDescription>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      setEditingPatient(selectedPatient);
-                      setFormOpen(true);
-                    }}
-                    className="rounded-sm"
-                  >
-                    <Edit3 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </SheetHeader>
+                  <div className="flex gap-2">
+                    {selectedPatient.auth_user_id ? (
+                      <Badge variant="outline" className="rounded-sm gap-1"><CheckCircle2 className="h-3 w-3" /> Acesso ativo</Badge>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          const email = prompt("Email do paciente para enviar o convite:");
+                          if (!email) return;
+                          const { data, error } = await supabase.functions.invoke("invite-patient", { body: { client_id: selectedPatient.id, email } });
+                          if (error || (data as any)?.error) return toast.error((data as any)?.error ?? error?.message ?? "Falha");
+                          toast.success("Convite enviado");
+                          await fetchProfile({ ...selectedPatient, auth_user_id: (data as any).user_id });
+                        }}
+                        className="rounded-sm gap-1"
+                      ><Mail className="h-4 w-4" /> Convidar</Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        setEditingPatient(selectedPatient);
+                        setFormOpen(true);
+                      }}
+                      className="rounded-sm"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </Button>
+                  </div>
 
               <Tabs defaultValue="anamnesis" className="mt-6">
                 <TabsList className="grid w-full grid-cols-3 rounded-sm">
