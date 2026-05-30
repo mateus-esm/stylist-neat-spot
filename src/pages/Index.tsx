@@ -9,6 +9,7 @@ import { Plus, ChevronLeft, ChevronRight, LogOut, DollarSign, Clock } from "luci
 import AppointmentForm from "@/components/AppointmentForm";
 import AppointmentSheet from "@/components/AppointmentSheet";
 import EvolutionSheet from "@/components/EvolutionSheet";
+import PendingRequestsBanner from "@/components/PendingRequestsBanner";
 import { BrandLogo } from "@/components/BrandLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
@@ -145,6 +146,7 @@ const Index = () => {
       </header>
 
       <div className="mx-auto max-w-3xl px-4 pt-5">
+        <PendingRequestsBanner onChange={fetchAppointments} />
         {view === "day" && <DayView date={anchorDate} appointments={appointments} onSelect={openSheet} />}
         {view === "week" && <WeekView startDate={range.start} appointments={appointments} onSelect={openSheet} />}
         {view === "month" && (
