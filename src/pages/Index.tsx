@@ -9,6 +9,7 @@ import { Plus, ChevronLeft, ChevronRight, LogOut, DollarSign, Clock } from "luci
 import AppointmentForm from "@/components/AppointmentForm";
 import AppointmentSheet from "@/components/AppointmentSheet";
 import EvolutionSheet from "@/components/EvolutionSheet";
+import PendingRequestsBanner from "@/components/PendingRequestsBanner";
 import { BrandLogo } from "@/components/BrandLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
