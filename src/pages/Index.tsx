@@ -146,6 +146,7 @@ const Index = () => {
       </header>
 
       <div className="mx-auto max-w-3xl px-4 pt-5">
+        <PendingRequestsBanner onChange={fetchAppointments} />
         {view === "day" && <DayView date={anchorDate} appointments={appointments} onSelect={openSheet} />}
         {view === "week" && <WeekView startDate={range.start} appointments={appointments} onSelect={openSheet} />}
         {view === "month" && (
