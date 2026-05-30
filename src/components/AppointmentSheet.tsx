@@ -71,82 +71,93 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
           </p>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6">
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="border-primary/40 text-primary">
-              {appointment.service}
-            </Badge>
-            <Badge variant="outline">{appointment.duration_min || 30} min</Badge>
-            <Badge className="bg-gradient-brand text-primary-foreground">
-              R$ {Number(appointment.price).toFixed(2)}
-            </Badge>
-          </div>
+        <Tabs defaultValue="detalhes" className="mt-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
+            <TabsTrigger value="prescricao">Prescrição</TabsTrigger>
+          </TabsList>
 
-          {client?.notes && (
-            <div className="rounded-lg border border-warning/30 bg-warning/10 p-3">
-              <p className="text-xs uppercase tracking-wider text-warning mb-1">⚠ Observações do cliente</p>
-              <p className="text-sm">{client.notes}</p>
+          <TabsContent value="detalhes" className="mt-4 space-y-6">
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="border-primary/40 text-primary">
+                {appointment.service}
+              </Badge>
+              <Badge variant="outline">{appointment.duration_min || 30} min</Badge>
+              <Badge className="bg-gradient-brand text-primary-foreground">
+                R$ {Number(appointment.price).toFixed(2)}
+              </Badge>
             </div>
-          )}
 
-          {appointment.photo_url && (
-            <div className="space-y-2">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Foto do corte</p>
-              <img src={appointment.photo_url} alt="Corte" className="w-full rounded-lg" />
+            {client?.notes && (
+              <div className="rounded-lg border border-warning/30 bg-warning/10 p-3">
+                <p className="text-xs uppercase tracking-wider text-warning mb-1">⚠ Observações do cliente</p>
+                <p className="text-sm">{client.notes}</p>
+              </div>
+            )}
+
+            {appointment.photo_url && (
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Foto do corte</p>
+                <img src={appointment.photo_url} alt="Corte" className="w-full rounded-lg" />
+              </div>
+            )}
+
+            {appointment.satisfaction && (
+              <div className="flex items-center gap-1">
+                {[1,2,3,4,5].map((n) => (
+                  <Star key={n} className={cn("h-5 w-5", n <= appointment.satisfaction ? "fill-accent text-accent" : "text-muted")} />
+                ))}
+              </div>
+            )}
+
+            {client?.phone && (
+              <div className="flex items-center gap-2 rounded-lg bg-secondary/40 p-3">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">{client.phone}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button onClick={notify} variant="outline" className="gap-2">
+                <MessageCircle className="h-4 w-4" /> Notificar
+              </Button>
+              <Button onClick={onEdit} variant="outline" className="gap-2">
+                <Edit3 className="h-4 w-4" /> Editar
+              </Button>
             </div>
-          )}
 
-          {appointment.satisfaction && (
-            <div className="flex items-center gap-1">
-              {[1,2,3,4,5].map((n) => (
-                <Star key={n} className={cn("h-5 w-5", n <= appointment.satisfaction ? "fill-accent text-accent" : "text-muted")} />
-              ))}
-            </div>
-          )}
-
-          {client?.phone && (
-            <div className="flex items-center gap-2 rounded-lg bg-secondary/40 p-3">
-              <Phone className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">{client.phone}</span>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-2">
-            <Button onClick={notify} variant="outline" className="gap-2">
-              <MessageCircle className="h-4 w-4" /> Notificar
-            </Button>
-            <Button onClick={onEdit} variant="outline" className="gap-2">
-              <Edit3 className="h-4 w-4" /> Editar
-            </Button>
-          </div>
-
-          {appointment.status !== "atendido" && (
-            <Button
-              onClick={onLog}
-              className="w-full bg-gradient-brand text-primary-foreground shadow-brand hover:opacity-90"
-              size="lg"
-            >
-              <Check className="h-5 w-5 mr-2" /> Marcar como atendido
-            </Button>
-          )}
-
-          <div className="grid grid-cols-2 gap-2">
-            {appointment.status !== "confirmado" && appointment.status !== "atendido" && (
-              <Button onClick={() => updateStatus("confirmado")} variant="outline" className="gap-2">
-                <Clock className="h-4 w-4" /> Confirmar
+            {appointment.status !== "atendido" && (
+              <Button
+                onClick={onLog}
+                className="w-full bg-gradient-brand text-primary-foreground shadow-brand hover:opacity-90"
+                size="lg"
+              >
+                <Check className="h-5 w-5 mr-2" /> Marcar como atendido
               </Button>
             )}
-            {appointment.status !== "faltou" && appointment.status !== "atendido" && (
-              <Button onClick={() => updateStatus("faltou")} variant="outline" className="gap-2 text-destructive">
-                <X className="h-4 w-4" /> Faltou
-              </Button>
-            )}
-          </div>
 
-          <Button onClick={remove} variant="ghost" className="w-full text-destructive hover:text-destructive">
-            <Trash2 className="h-4 w-4 mr-2" /> Excluir agendamento
-          </Button>
-        </div>
+            <div className="grid grid-cols-2 gap-2">
+              {appointment.status !== "confirmado" && appointment.status !== "atendido" && (
+                <Button onClick={() => updateStatus("confirmado")} variant="outline" className="gap-2">
+                  <Clock className="h-4 w-4" /> Confirmar
+                </Button>
+              )}
+              {appointment.status !== "faltou" && appointment.status !== "atendido" && (
+                <Button onClick={() => updateStatus("faltou")} variant="outline" className="gap-2 text-destructive">
+                  <X className="h-4 w-4" /> Faltou
+                </Button>
+              )}
+            </div>
+
+            <Button onClick={remove} variant="ghost" className="w-full text-destructive hover:text-destructive">
+              <Trash2 className="h-4 w-4 mr-2" /> Excluir agendamento
+            </Button>
+          </TabsContent>
+
+          <TabsContent value="prescricao" className="mt-4">
+            <PrescriptionTab appointmentId={appointment.id} />
+          </TabsContent>
+        </Tabs>
       </SheetContent>
     </Sheet>
   );
