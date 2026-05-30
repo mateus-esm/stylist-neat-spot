@@ -25,6 +25,18 @@ const ProtectedRoute = ({ children, allow }: { children: React.ReactNode; allow?
   const { role, loading: roleLoading } = useRole();
   if (loading || roleLoading) return <div className="flex min-h-screen items-center justify-center">Carregando...</div>;
   if (!user) return <Navigate to="/auth" replace />;
+  if (!role) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6 text-center">
+        <div className="max-w-sm space-y-3">
+          <h1 className="text-lg font-semibold">Conta sem permissão</h1>
+          <p className="text-sm text-muted-foreground">
+            Sua conta ainda não tem um papel atribuído. Solicite acesso ao administrador.
+          </p>
+        </div>
+      </div>
+    );
+  }
   if (allow && role !== allow) return <Navigate to={role === "patient" ? "/meu-app" : "/"} replace />;
   return <>{children}</>;
 };
@@ -33,7 +45,7 @@ const AuthRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   const { role, loading: roleLoading } = useRole();
   if (loading || (user && roleLoading)) return null;
-  if (user) return <Navigate to={role === "patient" ? "/meu-app" : "/"} replace />;
+  if (user && role) return <Navigate to={role === "patient" ? "/meu-app" : "/"} replace />;
   return <>{children}</>;
 };
 
