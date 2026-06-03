@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 
 const db = supabase as any;
@@ -24,15 +25,26 @@ interface Patient {
   phone: string | null;
 }
 
+interface ServiceOpt {
+  id: string;
+  name: string;
+  default_duration_min: number;
+  default_price: number;
+}
+
+const OTHER = "__other__";
+
 const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedDate }: AppointmentFormProps) => {
   const { user } = useAuth();
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [services, setServices] = useState<ServiceOpt[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
   const [clientId, setClientId] = useState("");
   const [clientName, setClientName] = useState("");
   const [packageId, setPackageId] = useState("avulso");
+  const [serviceChoice, setServiceChoice] = useState<string>("");
+  const [serviceText, setServiceText] = useState("");
   const [time, setTime] = useState("");
-  const [service, setService] = useState("");
   const [price, setPrice] = useState("");
   const [date, setDate] = useState(selectedDate);
   const [duration, setDuration] = useState("50");
@@ -40,14 +52,15 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
 
   useEffect(() => {
     if (!open || !user) return;
-
     fetchPatients();
+    fetchServices();
     if (appointment) {
       setClientId(appointment.client_id || "");
       setClientName(appointment.client_name);
       setPackageId(appointment.package_id || "avulso");
       setTime(appointment.appointment_time?.slice(0, 5) || "");
-      setService(appointment.service);
+      setServiceText(appointment.service);
+      setServiceChoice(OTHER);
       setPrice(String(appointment.price));
       setDate(appointment.appointment_date);
       setDuration(String(appointment.duration_min || 50));
@@ -57,7 +70,8 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
       setClientName("");
       setPackageId("avulso");
       setTime("");
-      setService("Sessao de fisioterapia");
+      setServiceChoice("");
+      setServiceText("");
       setPrice("");
       setDate(selectedDate);
       setDuration("50");
@@ -68,6 +82,11 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
   const fetchPatients = async () => {
     const { data } = await db.from("clients").select("id, name, phone").order("name");
     if (data) setPatients(data);
+  };
+
+  const fetchServices = async () => {
+    const { data } = await db.from("services").select("*").eq("active", true).order("name");
+    setServices(data || []);
   };
 
   const fetchPackages = async (patientId: string) => {
@@ -88,21 +107,42 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
     await fetchPackages(id);
   };
 
+  const handleServiceChange = (value: string) => {
+    setServiceChoice(value);
+    if (value === OTHER || value === "") {
+      return;
+    }
+    const svc = services.find((s) => s.id === value);
+    if (svc) {
+      setServiceText(svc.name);
+      setDuration(String(svc.default_duration_min));
+      if (packageId === "avulso") setPrice(String(svc.default_price));
+    }
+  };
+
+  const linkedToPackage = packageId !== "avulso" && packageId !== "";
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user) return;
+    if (!serviceText.trim()) {
+      toast({ title: "Informe o serviço", variant: "destructive" });
+      return;
+    }
     setLoading(true);
 
     const selectedPackage = packages.find((pkg) => pkg.id === packageId);
     const nextPackageIndex = selectedPackage ? Number(selectedPackage.completed_sessions || 0) + 1 : null;
+
     const data = {
       user_id: user.id,
       client_id: clientId || null,
       client_name: clientName,
       appointment_date: date,
       appointment_time: time,
-      service,
-      price: parseFloat(price) || 0,
+      service: serviceText.trim(),
+      price: linkedToPackage ? 0 : (parseFloat(price) || 0),
+      payment_status: linkedToPackage ? "pago" : (appointment?.payment_status || "pendente"),
       duration_min: parseInt(duration) || 50,
       package_id: selectedPackage?.id || null,
       package_session_index: nextPackageIndex,
@@ -112,11 +152,11 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
     if (appointment) {
       const { error } = await db.from("appointments").update(data).eq("id", appointment.id);
       if (error) toast({ title: "Erro", description: error.message, variant: "destructive" });
-      else toast({ title: "Sessao atualizada" });
+      else toast({ title: "Sessão atualizada" });
     } else {
       const { error } = await db.from("appointments").insert(data);
       if (error) toast({ title: "Erro", description: error.message, variant: "destructive" });
-      else toast({ title: "Sessao agendada" });
+      else toast({ title: "Sessão agendada" });
     }
 
     setLoading(false);
@@ -126,9 +166,9 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm rounded-sm">
+      <DialogContent className="max-w-sm rounded-sm max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{appointment ? "Editar sessao" : "Nova sessao"}</DialogTitle>
+          <DialogTitle>{appointment ? "Editar sessão" : "Nova sessão"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -139,55 +179,53 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
                   <SelectValue placeholder="Selecione um paciente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {patients.map((patient) => (
-                    <SelectItem key={patient.id} value={patient.id}>{patient.name}</SelectItem>
+                  {patients.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             ) : (
-              <Input
-                placeholder="Nome do paciente"
-                value={clientName}
-                onChange={(event) => setClientName(event.target.value)}
-                required
-                className="rounded-sm"
-              />
-            )}
-            {patients.length > 0 && !clientId && (
-              <Input
-                placeholder="Ou digite o nome"
-                value={clientName}
-                onChange={(event) => setClientName(event.target.value)}
-                className="rounded-sm"
-              />
+              <Input placeholder="Nome do paciente" value={clientName} onChange={(e) => setClientName(e.target.value)} required className="rounded-sm" />
             )}
           </div>
 
           <div className="space-y-2">
-            <Label>Horario</Label>
-            <Input type="time" value={time} onChange={(event) => setTime(event.target.value)} required className="rounded-sm" />
+            <Label>Horário</Label>
+            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} required className="rounded-sm" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Data</Label>
-              <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} required className="rounded-sm" />
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="rounded-sm" />
             </div>
             <div className="space-y-2">
-              <Label>Duracao (min)</Label>
-              <Input type="number" min="5" step="5" value={duration} onChange={(event) => setDuration(event.target.value)} required className="rounded-sm" />
+              <Label>Duração (min)</Label>
+              <Input type="number" min="5" step="5" value={duration} onChange={(e) => setDuration(e.target.value)} required className="rounded-sm" />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Evolucao / Sessao</Label>
-            <Input
-              placeholder="Ex: Reabilitacao de joelho, LCA fase 2"
-              value={service}
-              onChange={(event) => setService(event.target.value)}
-              required
-              className="rounded-sm"
-            />
+            <Label>Tipo de serviço</Label>
+            <Select value={serviceChoice} onValueChange={handleServiceChange}>
+              <SelectTrigger className="rounded-sm">
+                <SelectValue placeholder="Selecione um serviço" />
+              </SelectTrigger>
+              <SelectContent>
+                {services.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
+                <SelectItem value={OTHER}>Outro (texto livre)</SelectItem>
+              </SelectContent>
+            </Select>
+            {(serviceChoice === OTHER || services.length === 0) && (
+              <Input
+                placeholder="Descrição do serviço"
+                value={serviceText}
+                onChange={(e) => setServiceText(e.target.value)}
+                className="rounded-sm"
+              />
+            )}
           </div>
 
           <div className="space-y-2">
@@ -200,17 +238,26 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
                 <SelectItem value="avulso">Avulso</SelectItem>
                 {packages.map((pkg) => (
                   <SelectItem key={pkg.id} value={pkg.id}>
-                    {pkg.name} - sessao {Number(pkg.completed_sessions || 0) + 1} de {pkg.total_sessions}
+                    {pkg.name} — sessão {Number(pkg.completed_sessions || 0) + 1} de {pkg.total_sessions}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Valor (R$)</Label>
-            <Input type="number" step="0.01" min="0" placeholder="0,00" value={price} onChange={(event) => setPrice(event.target.value)} required className="rounded-sm" />
-          </div>
+          {linkedToPackage ? (
+            <div className="rounded-sm border border-border bg-secondary/30 p-3">
+              <Badge variant="outline" className="rounded-sm mb-1">Pacote</Badge>
+              <p className="text-xs text-muted-foreground">
+                Sessão vinculada a pacote ativo — valor R$ 0,00 (já pago no pacote).
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Valor (R$)</Label>
+              <Input type="number" step="0.01" min="0" placeholder="0,00" value={price} onChange={(e) => setPrice(e.target.value)} required className="rounded-sm" />
+            </div>
+          )}
 
           <Button type="submit" className="w-full rounded-sm" disabled={loading}>
             {loading ? "Salvando..." : appointment ? "Salvar" : "Agendar"}

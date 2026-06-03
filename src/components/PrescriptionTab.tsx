@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Check } from "lucide-react";
+import { Plus, Trash2, Check, Smile, Meh, Frown } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -20,10 +20,17 @@ interface Exercise {
   load: string | null;
   notes: string | null;
   completed_at: string | null;
+  performance: string | null;
   order_index: number;
 }
 
 const emptyForm = { name: "", sets: "", reps: "", load: "", notes: "" };
+
+const perfMeta: Record<string, { label: string; icon: any; cls: string }> = {
+  good: { label: "Bom", icon: Smile, cls: "text-success" },
+  neutral: { label: "Neutro", icon: Meh, cls: "text-muted-foreground" },
+  bad: { label: "Difícil", icon: Frown, cls: "text-destructive" },
+};
 
 const PrescriptionTab = ({ appointmentId }: Props) => {
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -73,77 +80,55 @@ const PrescriptionTab = ({ appointmentId }: Props) => {
         {exercises.length === 0 && (
           <p className="text-sm text-muted-foreground italic">Nenhum exercício prescrito.</p>
         )}
-        {exercises.map((ex) => (
-          <div
-            key={ex.id}
-            className={cn(
-              "rounded-lg border border-border bg-card p-3",
-              ex.completed_at && "border-success/40 bg-success/5"
-            )}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold">{ex.name}</p>
-                  {ex.completed_at && <Check className="h-3.5 w-3.5 text-success" />}
+        {exercises.map((ex) => {
+          const perf = ex.performance ? perfMeta[ex.performance] : null;
+          const Icon = perf?.icon;
+          return (
+            <div
+              key={ex.id}
+              className={cn(
+                "rounded-sm border border-border bg-card p-3",
+                ex.completed_at && "border-success/40 bg-success/5"
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold">{ex.name}</p>
+                    {ex.completed_at && <Check className="h-3.5 w-3.5 text-success" />}
+                    {Icon && perf && (
+                      <span className={cn("flex items-center gap-1 text-[10px] uppercase tracking-wider", perf.cls)}>
+                        <Icon className="h-3 w-3" /> {perf.label}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {[
+                      ex.sets && `${ex.sets} séries`,
+                      ex.reps && `${ex.reps} reps`,
+                      ex.load && ex.load,
+                    ].filter(Boolean).join(" • ")}
+                  </p>
+                  {ex.notes && <p className="text-xs text-muted-foreground mt-1">{ex.notes}</p>}
                 </div>
-                <p className="text-xs text-muted-foreground font-mono-data mt-0.5">
-                  {[
-                    ex.sets && `${ex.sets} séries`,
-                    ex.reps && `${ex.reps} reps`,
-                    ex.load && ex.load,
-                  ]
-                    .filter(Boolean)
-                    .join(" • ")}
-                </p>
-                {ex.notes && <p className="text-xs text-muted-foreground mt-1">{ex.notes}</p>}
+                <Button size="icon" variant="ghost" onClick={() => remove(ex.id)} className="h-7 w-7 text-destructive">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </div>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => remove(ex.id)}
-                className="h-7 w-7 text-destructive"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      <div className="rounded-lg border border-dashed border-border p-3 space-y-2">
-        <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-          Adicionar exercício
-        </Label>
-        <Input
-          placeholder="Nome do exercício"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-        />
+      <div className="rounded-sm border border-dashed border-border p-3 space-y-2">
+        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Adicionar exercício</Label>
+        <Input placeholder="Nome do exercício" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <div className="grid grid-cols-3 gap-2">
-          <Input
-            placeholder="Séries"
-            type="number"
-            value={form.sets}
-            onChange={(e) => setForm({ ...form, sets: e.target.value })}
-          />
-          <Input
-            placeholder="Reps"
-            value={form.reps}
-            onChange={(e) => setForm({ ...form, reps: e.target.value })}
-          />
-          <Input
-            placeholder="Carga"
-            value={form.load}
-            onChange={(e) => setForm({ ...form, load: e.target.value })}
-          />
+          <Input placeholder="Séries" type="number" value={form.sets} onChange={(e) => setForm({ ...form, sets: e.target.value })} />
+          <Input placeholder="Reps" value={form.reps} onChange={(e) => setForm({ ...form, reps: e.target.value })} />
+          <Input placeholder="Carga" value={form.load} onChange={(e) => setForm({ ...form, load: e.target.value })} />
         </div>
-        <Textarea
-          placeholder="Observações (opcional)"
-          value={form.notes}
-          onChange={(e) => setForm({ ...form, notes: e.target.value })}
-          rows={2}
-        />
+        <Textarea placeholder="Observações (opcional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
         <Button onClick={add} disabled={saving} className="w-full" size="sm">
           <Plus className="h-4 w-4 mr-2" /> Adicionar
         </Button>
