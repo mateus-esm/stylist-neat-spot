@@ -1,4 +1,4 @@
-import { CalendarDays, Users, LineChart, RotateCcw, CalendarClock, Activity, LayoutDashboard } from "lucide-react";
+import { CalendarDays, Users, LineChart, Package, LayoutDashboard, Settings as SettingsIcon } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/hooks/useRole";
@@ -6,9 +6,9 @@ import { useRole } from "@/hooks/useRole";
 const adminTabs = [
   { path: "/", icon: CalendarDays, label: "Agenda" },
   { path: "/pacientes", icon: Users, label: "Pacientes" },
-  { path: "/disponibilidade", icon: CalendarClock, label: "Slots" },
-  { path: "/retornos", icon: RotateCcw, label: "Retornos" },
+  { path: "/pacotes", icon: Package, label: "Pacotes" },
   { path: "/financeiro", icon: LineChart, label: "Financeiro" },
+  { path: "/configuracoes", icon: SettingsIcon, label: "Config" },
 ];
 
 const patientTabs = [

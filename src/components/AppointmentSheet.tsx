@@ -10,6 +10,7 @@ import { Phone, MessageCircle, Check, X, Clock, Edit3, Trash2, Star } from "luci
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import PrescriptionTab from "./PrescriptionTab";
+import MediaTab from "./MediaTab";
 
 interface Props {
   open: boolean;
@@ -72,9 +73,10 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
         </SheetHeader>
 
         <Tabs defaultValue="detalhes" className="mt-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
             <TabsTrigger value="prescricao">Prescrição</TabsTrigger>
+            <TabsTrigger value="midia">Mídia</TabsTrigger>
           </TabsList>
 
           <TabsContent value="detalhes" className="mt-4 space-y-6">
@@ -156,6 +158,10 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
 
           <TabsContent value="prescricao" className="mt-4">
             <PrescriptionTab appointmentId={appointment.id} />
+          </TabsContent>
+
+          <TabsContent value="midia" className="mt-4">
+            <MediaTab appointmentId={appointment.id} />
           </TabsContent>
         </Tabs>
       </SheetContent>

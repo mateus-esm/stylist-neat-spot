@@ -30,6 +30,7 @@ export type Database = {
           package_session_index: number | null
           package_total: number | null
           pain_scale: number | null
+          patient_notes: string | null
           payment_status: string
           photo_url: string | null
           price: number
@@ -54,6 +55,7 @@ export type Database = {
           package_session_index?: number | null
           package_total?: number | null
           pain_scale?: number | null
+          patient_notes?: string | null
           payment_status?: string
           photo_url?: string | null
           price?: number
@@ -78,6 +80,7 @@ export type Database = {
           package_session_index?: number | null
           package_total?: number | null
           pain_scale?: number | null
+          patient_notes?: string | null
           payment_status?: string
           photo_url?: string | null
           price?: number
@@ -202,8 +205,10 @@ export type Database = {
           finished_at: string | null
           id: string
           name: string
+          paid_at: string | null
           payment_status: string
           price: number
+          service: string | null
           started_at: string | null
           status: string
           total_sessions: number
@@ -217,8 +222,10 @@ export type Database = {
           finished_at?: string | null
           id?: string
           name: string
+          paid_at?: string | null
           payment_status?: string
           price?: number
+          service?: string | null
           started_at?: string | null
           status?: string
           total_sessions?: number
@@ -232,8 +239,10 @@ export type Database = {
           finished_at?: string | null
           id?: string
           name?: string
+          paid_at?: string | null
           payment_status?: string
           price?: number
+          service?: string | null
           started_at?: string | null
           status?: string
           total_sessions?: number
@@ -250,6 +259,39 @@ export type Database = {
           },
         ]
       }
+      services: {
+        Row: {
+          active: boolean
+          created_at: string
+          default_duration_min: number
+          default_price: number
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          default_duration_min?: number
+          default_price?: number
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          default_duration_min?: number
+          default_price?: number
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       session_exercises: {
         Row: {
           appointment_id: string
@@ -260,6 +302,7 @@ export type Database = {
           name: string
           notes: string | null
           order_index: number
+          performance: string | null
           reps: string | null
           rest_seconds: number | null
           sets: number | null
@@ -275,6 +318,7 @@ export type Database = {
           name: string
           notes?: string | null
           order_index?: number
+          performance?: string | null
           reps?: string | null
           rest_seconds?: number | null
           sets?: number | null
@@ -290,11 +334,42 @@ export type Database = {
           name?: string
           notes?: string | null
           order_index?: number
+          performance?: string | null
           reps?: string | null
           rest_seconds?: number | null
           sets?: number | null
           updated_at?: string
           video_url?: string | null
+        }
+        Relationships: []
+      }
+      session_media: {
+        Row: {
+          appointment_id: string
+          caption: string | null
+          created_at: string
+          id: string
+          media_type: string
+          storage_path: string
+          uploaded_by: string
+        }
+        Insert: {
+          appointment_id: string
+          caption?: string | null
+          created_at?: string
+          id?: string
+          media_type?: string
+          storage_path: string
+          uploaded_by: string
+        }
+        Update: {
+          appointment_id?: string
+          caption?: string | null
+          created_at?: string
+          id?: string
+          media_type?: string
+          storage_path?: string
+          uploaded_by?: string
         }
         Relationships: []
       }
