@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { Plus, Trash2, Check, Smile, Meh, Frown } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -73,6 +75,23 @@ const PrescriptionTab = ({ appointmentId }: Props) => {
     if (error) return toast.error(error.message);
     fetchEx();
   };
+
+  const toggleDone = async (ex: Exercise) => {
+    const completed_at = ex.completed_at ? null : new Date().toISOString();
+    const { error } = await supabase.from("session_exercises").update({ completed_at }).eq("id", ex.id);
+    if (error) return toast.error(error.message);
+    setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, completed_at } : r)));
+  };
+
+  const setPerf = async (ex: Exercise, performance: string) => {
+    const next = ex.performance === performance ? null : performance;
+    const { error } = await supabase.from("session_exercises").update({ performance: next }).eq("id", ex.id);
+    if (error) return toast.error(error.message);
+    setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, performance: next } : r)));
+  };
+
+  const doneCount = exercises.filter((e) => e.completed_at).length;
+  const pct = exercises.length > 0 ? (doneCount / exercises.length) * 100 : 0;
 
   return (
     <div className="space-y-4">
