@@ -61,6 +61,9 @@ const Packages = () => {
     payment_status: "pendente",
   });
 
+  const [forecasts, setForecasts] = useState<Record<string, Date | null>>({});
+  const [closeTarget, setCloseTarget] = useState<Pkg | null>(null);
+
   const load = async () => {
     const [{ data: pkg }, { data: cli }, { data: svc }] = await Promise.all([
       db.from("patient_packages").select("*").order("created_at", { ascending: false }),
@@ -74,6 +77,23 @@ const Packages = () => {
 
   useEffect(() => { load(); }, []);
 
+  // Compute forecasts whenever packages change
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const map: Record<string, Date | null> = {};
+      await Promise.all(
+        packages
+          .filter((p) => p.status === "ativo")
+          .map(async (p) => {
+            map[p.id] = await forecastPackageEnd(p);
+          })
+      );
+      if (!cancelled) setForecasts(map);
+    })();
+    return () => { cancelled = true; };
+  }, [packages]);
+
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name || "—";
 
   const filtered = useMemo(() => packages.filter((p) =>
@@ -83,9 +103,14 @@ const Packages = () => {
   ), [packages, filterClient, filterService, filterStatus]);
 
   const totals = useMemo(() => {
+    const now = new Date();
     const ativos = packages.filter((p) => p.status === "ativo");
     const pagoMes = packages
-      .filter((p) => p.payment_status === "pago" && p.paid_at && new Date(p.paid_at).getMonth() === new Date().getMonth())
+      .filter((p) => {
+        if (p.payment_status !== "pago" || !p.paid_at) return false;
+        const d = new Date(p.paid_at);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      })
       .reduce((s, p) => s + Number(p.price), 0);
     const pendente = ativos.filter((p) => p.payment_status === "pendente").reduce((s, p) => s + Number(p.price), 0);
     return { ativos: ativos.length, pagoMes, pendente };
