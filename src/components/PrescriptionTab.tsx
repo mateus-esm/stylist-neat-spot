@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { Plus, Trash2, Check, Smile, Meh, Frown } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -74,8 +76,35 @@ const PrescriptionTab = ({ appointmentId }: Props) => {
     fetchEx();
   };
 
+  const toggleDone = async (ex: Exercise) => {
+    const completed_at = ex.completed_at ? null : new Date().toISOString();
+    const { error } = await supabase.from("session_exercises").update({ completed_at }).eq("id", ex.id);
+    if (error) return toast.error(error.message);
+    setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, completed_at } : r)));
+  };
+
+  const setPerf = async (ex: Exercise, performance: string) => {
+    const next = ex.performance === performance ? null : performance;
+    const { error } = await supabase.from("session_exercises").update({ performance: next }).eq("id", ex.id);
+    if (error) return toast.error(error.message);
+    setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, performance: next } : r)));
+  };
+
+  const doneCount = exercises.filter((e) => e.completed_at).length;
+  const pct = exercises.length > 0 ? (doneCount / exercises.length) * 100 : 0;
+
   return (
     <div className="space-y-4">
+      {exercises.length > 0 && (
+        <div className="rounded-sm border border-border bg-secondary/30 p-3 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="uppercase tracking-wider text-muted-foreground">Conclusão da sessão</span>
+            <span className="font-semibold">{doneCount}/{exercises.length} · {pct.toFixed(0)}%</span>
+          </div>
+          <Progress value={pct} className="h-1.5" />
+        </div>
+      )}
+
       <div className="space-y-2">
         {exercises.length === 0 && (
           <p className="text-sm text-muted-foreground italic">Nenhum exercício prescrito.</p>
@@ -87,14 +116,19 @@ const PrescriptionTab = ({ appointmentId }: Props) => {
             <div
               key={ex.id}
               className={cn(
-                "rounded-sm border border-border bg-card p-3",
+                "rounded-sm border border-border bg-card p-3 space-y-2",
                 ex.completed_at && "border-success/40 bg-success/5"
               )}
             >
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  checked={!!ex.completed_at}
+                  onCheckedChange={() => toggleDone(ex)}
+                  className="mt-1"
+                />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold">{ex.name}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className={cn("text-sm font-semibold", ex.completed_at && "line-through text-muted-foreground")}>{ex.name}</p>
                     {ex.completed_at && <Check className="h-3.5 w-3.5 text-success" />}
                     {Icon && perf && (
                       <span className={cn("flex items-center gap-1 text-[10px] uppercase tracking-wider", perf.cls)}>
@@ -114,6 +148,26 @@ const PrescriptionTab = ({ appointmentId }: Props) => {
                 <Button size="icon" variant="ghost" onClick={() => remove(ex.id)} className="h-7 w-7 text-destructive">
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
+              </div>
+              <div className="flex gap-2 pl-6">
+                {(["good", "neutral", "bad"] as const).map((key) => {
+                  const meta = perfMeta[key];
+                  const MetaIcon = meta.icon;
+                  const active = ex.performance === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setPerf(ex, key)}
+                      className={cn(
+                        "flex flex-1 items-center justify-center gap-1 rounded-sm border px-2 py-1.5 text-[11px] uppercase tracking-wider transition",
+                        active ? `${meta.cls} border-current bg-secondary/40` : "border-border text-muted-foreground hover:border-foreground/40"
+                      )}
+                    >
+                      <MetaIcon className="h-3.5 w-3.5" /> {meta.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           );

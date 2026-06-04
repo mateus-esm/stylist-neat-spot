@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { completeAppointment } from "@/lib/appointmentCompletion";
 
 const db = supabase as any;
 
@@ -91,42 +92,22 @@ const EvolutionSheet = ({ open, onOpenChange, appointment, onSuccess }: Props) =
     setLoading(true);
 
     const selectedPackage = packages.find((pkg) => pkg.id === packageId);
-    let packageSessionIndex = null;
-    let packageTotal = null;
+    const packageSessionIndex = selectedPackage
+      ? (appointment.package_session_index || Number(selectedPackage.completed_sessions || 0) + 1)
+      : null;
+    const packageTotal = selectedPackage ? Number(selectedPackage.total_sessions || 0) : null;
 
-    if (selectedPackage) {
-      const completedSessions = Number(selectedPackage.completed_sessions || 0);
-      const totalSessions = Number(selectedPackage.total_sessions || 0);
-      packageSessionIndex = appointment.package_session_index || Math.min(completedSessions + 1, totalSessions || completedSessions + 1);
-      packageTotal = totalSessions || null;
-      const nextCompleted = Math.min(Math.max(completedSessions + 1, packageSessionIndex), totalSessions || completedSessions + 1);
-      const isFinished = totalSessions > 0 && nextCompleted >= totalSessions;
-
-      const { error: packageError } = await db
-        .from("patient_packages")
-        .update({
-          completed_sessions: nextCompleted,
-          status: isFinished ? "concluido" : "ativo",
-          finished_at: isFinished ? new Date().toISOString() : null,
-          payment_status: selectedPackage.payment_status === "pago" ? "pago" : paymentStatus,
-        })
-        .eq("id", selectedPackage.id);
-
-      if (packageError) {
-        setLoading(false);
-        toast.error("Erro ao atualizar pacote", { description: packageError.message });
-        return;
-      }
-    }
+    // For package-linked sessions, force price=0 and don't override payment_status of the package.
+    const effectivePrice = selectedPackage ? 0 : (parseFloat(price) || 0);
+    const effectivePayment = selectedPackage ? "pago" : paymentStatus;
 
     const mediaUrl = await uploadMedia();
     const { error } = await db
       .from("appointments")
       .update({
-        status: "atendido",
         duration_min: parseInt(duration) || 50,
-        price: parseFloat(price) || 0,
-        payment_status: paymentStatus,
+        price: effectivePrice,
+        payment_status: effectivePayment,
         package_id: selectedPackage?.id || null,
         package_session_index: packageSessionIndex,
         package_total: packageTotal,
@@ -138,14 +119,22 @@ const EvolutionSheet = ({ open, onOpenChange, appointment, onSuccess }: Props) =
       })
       .eq("id", appointment.id);
 
-    setLoading(false);
     if (error) {
+      setLoading(false);
       toast.error("Erro ao registrar evolucao", { description: error.message });
       return;
     }
 
+    // Use shared helper to mark atendido + increment package counter idempotently
+    const { error: completeErr } = await completeAppointment(appointment.id);
+    setLoading(false);
+    if (completeErr) {
+      toast.error("Erro ao concluir sessão", { description: completeErr });
+      return;
+    }
+
     toast.success("Evolucao registrada", {
-      description: paymentStatus === "pendente" ? "Fluxo operacional concluido; financeiro ficou pendente." : "Sessao e financeiro atualizados.",
+      description: effectivePayment === "pendente" ? "Fluxo operacional concluido; financeiro ficou pendente." : "Sessao e financeiro atualizados.",
     });
     onOpenChange(false);
     onSuccess();

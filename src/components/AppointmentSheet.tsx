@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import PrescriptionTab from "./PrescriptionTab";
 import MediaTab from "./MediaTab";
+import { completeAppointment } from "@/lib/appointmentCompletion";
 
 interface Props {
   open: boolean;
@@ -36,8 +37,13 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
   if (!appointment) return null;
 
   const updateStatus = async (status: string) => {
-    const { error } = await supabase.from("appointments").update({ status }).eq("id", appointment.id);
-    if (error) return toast.error(error.message);
+    if (status === "atendido") {
+      const { error } = await completeAppointment(appointment.id);
+      if (error) return toast.error(error);
+    } else {
+      const { error } = await supabase.from("appointments").update({ status }).eq("id", appointment.id);
+      if (error) return toast.error(error.message);
+    }
     toast.success("Status atualizado");
     onRefresh();
     onOpenChange(false);

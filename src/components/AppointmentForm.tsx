@@ -125,13 +125,18 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user) return;
-    if (!serviceText.trim()) {
+
+    const selectedPackage = packages.find((pkg) => pkg.id === packageId);
+    const finalService = linkedToPackage
+      ? (selectedPackage?.service || selectedPackage?.name || serviceText.trim() || "Sessão de pacote")
+      : serviceText.trim();
+
+    if (!linkedToPackage && !finalService) {
       toast({ title: "Informe o serviço", variant: "destructive" });
       return;
     }
     setLoading(true);
 
-    const selectedPackage = packages.find((pkg) => pkg.id === packageId);
     const nextPackageIndex = selectedPackage ? Number(selectedPackage.completed_sessions || 0) + 1 : null;
 
     const data = {
@@ -140,7 +145,7 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
       client_name: clientName,
       appointment_date: date,
       appointment_time: time,
-      service: serviceText.trim(),
+      service: finalService,
       price: linkedToPackage ? 0 : (parseFloat(price) || 0),
       payment_status: linkedToPackage ? "pago" : (appointment?.payment_status || "pendente"),
       duration_min: parseInt(duration) || 50,
@@ -205,28 +210,30 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Tipo de serviço</Label>
-            <Select value={serviceChoice} onValueChange={handleServiceChange}>
-              <SelectTrigger className="rounded-sm">
-                <SelectValue placeholder="Selecione um serviço" />
-              </SelectTrigger>
-              <SelectContent>
-                {services.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                ))}
-                <SelectItem value={OTHER}>Outro (texto livre)</SelectItem>
-              </SelectContent>
-            </Select>
-            {(serviceChoice === OTHER || services.length === 0) && (
-              <Input
-                placeholder="Descrição do serviço"
-                value={serviceText}
-                onChange={(e) => setServiceText(e.target.value)}
-                className="rounded-sm"
-              />
-            )}
-          </div>
+          {!linkedToPackage && (
+            <div className="space-y-2">
+              <Label>Tipo de serviço</Label>
+              <Select value={serviceChoice} onValueChange={handleServiceChange}>
+                <SelectTrigger className="rounded-sm">
+                  <SelectValue placeholder="Selecione um serviço" />
+                </SelectTrigger>
+                <SelectContent>
+                  {services.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                  <SelectItem value={OTHER}>Outro (texto livre)</SelectItem>
+                </SelectContent>
+              </Select>
+              {(serviceChoice === OTHER || services.length === 0) && (
+                <Input
+                  placeholder="Descrição do serviço"
+                  value={serviceText}
+                  onChange={(e) => setServiceText(e.target.value)}
+                  className="rounded-sm"
+                />
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Plano vinculado</Label>
@@ -245,14 +252,7 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
             </Select>
           </div>
 
-          {linkedToPackage ? (
-            <div className="rounded-sm border border-border bg-secondary/30 p-3">
-              <Badge variant="outline" className="rounded-sm mb-1">Pacote</Badge>
-              <p className="text-xs text-muted-foreground">
-                Sessão vinculada a pacote ativo — valor R$ 0,00 (já pago no pacote).
-              </p>
-            </div>
-          ) : (
+          {!linkedToPackage && (
             <div className="space-y-2">
               <Label>Valor (R$)</Label>
               <Input type="number" step="0.01" min="0" placeholder="0,00" value={price} onChange={(e) => setPrice(e.target.value)} required className="rounded-sm" />

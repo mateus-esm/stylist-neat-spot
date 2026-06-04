@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { format, differenceInCalendarDays, addDays } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,9 +11,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { BrandLogo } from "@/components/BrandLogo";
 import { Plus, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { forecastPackageEnd } from "@/lib/packageForecast";
 
 const db = supabase as any;
 
@@ -50,6 +61,9 @@ const Packages = () => {
     payment_status: "pendente",
   });
 
+  const [forecasts, setForecasts] = useState<Record<string, Date | null>>({});
+  const [closeTarget, setCloseTarget] = useState<Pkg | null>(null);
+
   const load = async () => {
     const [{ data: pkg }, { data: cli }, { data: svc }] = await Promise.all([
       db.from("patient_packages").select("*").order("created_at", { ascending: false }),
@@ -63,6 +77,23 @@ const Packages = () => {
 
   useEffect(() => { load(); }, []);
 
+  // Compute forecasts whenever packages change
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const map: Record<string, Date | null> = {};
+      await Promise.all(
+        packages
+          .filter((p) => p.status === "ativo")
+          .map(async (p) => {
+            map[p.id] = await forecastPackageEnd(p);
+          })
+      );
+      if (!cancelled) setForecasts(map);
+    })();
+    return () => { cancelled = true; };
+  }, [packages]);
+
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name || "—";
 
   const filtered = useMemo(() => packages.filter((p) =>
@@ -72,9 +103,14 @@ const Packages = () => {
   ), [packages, filterClient, filterService, filterStatus]);
 
   const totals = useMemo(() => {
+    const now = new Date();
     const ativos = packages.filter((p) => p.status === "ativo");
     const pagoMes = packages
-      .filter((p) => p.payment_status === "pago" && p.paid_at && new Date(p.paid_at).getMonth() === new Date().getMonth())
+      .filter((p) => {
+        if (p.payment_status !== "pago" || !p.paid_at) return false;
+        const d = new Date(p.paid_at);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      })
       .reduce((s, p) => s + Number(p.price), 0);
     const pendente = ativos.filter((p) => p.payment_status === "pendente").reduce((s, p) => s + Number(p.price), 0);
     return { ativos: ativos.length, pagoMes, pendente };
@@ -110,23 +146,15 @@ const Packages = () => {
     load();
   };
 
-  const close = async (p: Pkg) => {
-    if (!confirm("Encerrar este pacote?")) return;
+  const confirmClose = async () => {
+    if (!closeTarget) return;
     const { error } = await db.from("patient_packages")
       .update({ status: "encerrado", finished_at: new Date().toISOString() })
-      .eq("id", p.id);
+      .eq("id", closeTarget.id);
+    setCloseTarget(null);
     if (error) return toast.error(error.message);
+    toast.success("Pacote encerrado");
     load();
-  };
-
-  const forecast = (p: Pkg) => {
-    if (!p.started_at) return null;
-    const days = differenceInCalendarDays(new Date(), new Date(p.started_at)) || 1;
-    const ratePerDay = p.completed_sessions / days;
-    if (ratePerDay <= 0) return null;
-    const remaining = p.total_sessions - p.completed_sessions;
-    const daysLeft = Math.ceil(remaining / ratePerDay);
-    return addDays(new Date(), daysLeft);
   };
 
   return (
@@ -188,7 +216,7 @@ const Packages = () => {
           ) : (
             filtered.map((p) => {
               const pct = (p.completed_sessions / p.total_sessions) * 100;
-              const f = forecast(p);
+              const f = forecasts[p.id] || null;
               return (
                 <Card key={p.id} className="rounded-sm">
                   <CardContent className="p-4 space-y-3">
@@ -221,7 +249,7 @@ const Packages = () => {
                             <CheckCircle2 className="h-3.5 w-3.5" /> Marcar pago
                           </Button>
                         )}
-                        <Button size="sm" variant="ghost" className="rounded-sm text-destructive" onClick={() => close(p)}>
+                        <Button size="sm" variant="ghost" className="rounded-sm text-destructive" onClick={() => setCloseTarget(p)}>
                           Encerrar
                         </Button>
                       </div>
@@ -284,6 +312,21 @@ const Packages = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!closeTarget} onOpenChange={(o) => !o && setCloseTarget(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Encerrar pacote?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {closeTarget && `"${closeTarget.name}" será marcado como encerrado. Sessões já realizadas permanecem no histórico.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmClose}>Encerrar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
