@@ -125,13 +125,18 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user) return;
-    if (!serviceText.trim()) {
+
+    const selectedPackage = packages.find((pkg) => pkg.id === packageId);
+    const finalService = linkedToPackage
+      ? (selectedPackage?.service || selectedPackage?.name || serviceText.trim() || "Sessão de pacote")
+      : serviceText.trim();
+
+    if (!linkedToPackage && !finalService) {
       toast({ title: "Informe o serviço", variant: "destructive" });
       return;
     }
     setLoading(true);
 
-    const selectedPackage = packages.find((pkg) => pkg.id === packageId);
     const nextPackageIndex = selectedPackage ? Number(selectedPackage.completed_sessions || 0) + 1 : null;
 
     const data = {
@@ -140,7 +145,7 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
       client_name: clientName,
       appointment_date: date,
       appointment_time: time,
-      service: serviceText.trim(),
+      service: finalService,
       price: linkedToPackage ? 0 : (parseFloat(price) || 0),
       payment_status: linkedToPackage ? "pago" : (appointment?.payment_status || "pendente"),
       duration_min: parseInt(duration) || 50,
