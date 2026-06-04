@@ -216,7 +216,7 @@ const Packages = () => {
           ) : (
             filtered.map((p) => {
               const pct = (p.completed_sessions / p.total_sessions) * 100;
-              const f = forecast(p);
+              const f = forecasts[p.id] || null;
               return (
                 <Card key={p.id} className="rounded-sm">
                   <CardContent className="p-4 space-y-3">
@@ -249,7 +249,7 @@ const Packages = () => {
                             <CheckCircle2 className="h-3.5 w-3.5" /> Marcar pago
                           </Button>
                         )}
-                        <Button size="sm" variant="ghost" className="rounded-sm text-destructive" onClick={() => close(p)}>
+                        <Button size="sm" variant="ghost" className="rounded-sm text-destructive" onClick={() => setCloseTarget(p)}>
                           Encerrar
                         </Button>
                       </div>
