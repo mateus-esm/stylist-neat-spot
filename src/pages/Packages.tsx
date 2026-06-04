@@ -312,6 +312,21 @@ const Packages = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!closeTarget} onOpenChange={(o) => !o && setCloseTarget(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Encerrar pacote?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {closeTarget && `"${closeTarget.name}" será marcado como encerrado. Sessões já realizadas permanecem no histórico.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmClose}>Encerrar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
