@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { format, differenceInCalendarDays, addDays } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,9 +11,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { BrandLogo } from "@/components/BrandLogo";
 import { Plus, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { forecastPackageEnd } from "@/lib/packageForecast";
 
 const db = supabase as any;
 
