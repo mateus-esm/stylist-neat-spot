@@ -146,23 +146,15 @@ const Packages = () => {
     load();
   };
 
-  const close = async (p: Pkg) => {
-    if (!confirm("Encerrar este pacote?")) return;
+  const confirmClose = async () => {
+    if (!closeTarget) return;
     const { error } = await db.from("patient_packages")
       .update({ status: "encerrado", finished_at: new Date().toISOString() })
-      .eq("id", p.id);
+      .eq("id", closeTarget.id);
+    setCloseTarget(null);
     if (error) return toast.error(error.message);
+    toast.success("Pacote encerrado");
     load();
-  };
-
-  const forecast = (p: Pkg) => {
-    if (!p.started_at) return null;
-    const days = differenceInCalendarDays(new Date(), new Date(p.started_at)) || 1;
-    const ratePerDay = p.completed_sessions / days;
-    if (ratePerDay <= 0) return null;
-    const remaining = p.total_sessions - p.completed_sessions;
-    const daysLeft = Math.ceil(remaining / ratePerDay);
-    return addDays(new Date(), daysLeft);
   };
 
   return (
