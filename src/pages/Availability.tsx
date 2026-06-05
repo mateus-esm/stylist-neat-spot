@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, CalendarClock } from "lucide-react";
+import { Plus, Trash2, CalendarClock, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/BrandLogo";
+import BulkSlotsDialog from "@/components/BulkSlotsDialog";
 
 const db = supabase as any;
 
