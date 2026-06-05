@@ -48,12 +48,14 @@ const Packages = () => {
   const [packages, setPackages] = useState<Pkg[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
   const [filterClient, setFilterClient] = useState<string>("all");
   const [filterService, setFilterService] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("ativo");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     client_id: "",
+    template_id: "custom",
     name: "",
     service: "",
     total_sessions: "10",
@@ -65,14 +67,16 @@ const Packages = () => {
   const [closeTarget, setCloseTarget] = useState<Pkg | null>(null);
 
   const load = async () => {
-    const [{ data: pkg }, { data: cli }, { data: svc }] = await Promise.all([
+    const [{ data: pkg }, { data: cli }, { data: svc }, { data: tpl }] = await Promise.all([
       db.from("patient_packages").select("*").order("created_at", { ascending: false }),
       db.from("clients").select("id, name").order("name"),
       db.from("services").select("name").eq("active", true).order("name"),
+      db.from("package_templates").select("*").eq("active", true).order("name"),
     ]);
     setPackages(pkg || []);
     setClients(cli || []);
     setServices(svc || []);
+    setTemplates(tpl || []);
   };
 
   useEffect(() => { load(); }, []);
