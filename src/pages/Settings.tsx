@@ -1,5 +1,6 @@
 import { BrandLogo } from "@/components/BrandLogo";
 import ServiceManager from "@/components/ServiceManager";
+import PackageTemplateManager from "@/components/PackageTemplateManager";
 
 const Settings = () => {
   return (
@@ -15,10 +16,18 @@ const Settings = () => {
         <section>
           <h1 className="text-xl font-semibold">Catálogo de serviços</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Gerencie os tipos de atendimento usados ao agendar sessões.
+            Tipos de atendimento usados ao agendar sessões.
           </p>
         </section>
         <ServiceManager />
+
+        <section className="pt-4">
+          <h2 className="text-xl font-semibold">Pacotes-padrão</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Modelos como LCA, Menisco, Lombalgia. Usados ao criar um novo pacote para o paciente.
+          </p>
+        </section>
+        <PackageTemplateManager />
       </main>
     </div>
   );
