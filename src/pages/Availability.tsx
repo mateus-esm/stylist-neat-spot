@@ -25,6 +25,7 @@ const Availability = () => {
   const [end, setEnd] = useState("09:00");
   const [status, setStatus] = useState<"aberto" | "bloqueado">("aberto");
   const [reason, setReason] = useState("");
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const fetchSlots = async () => {
     const { data } = await db
