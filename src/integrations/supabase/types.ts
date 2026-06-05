@@ -114,6 +114,7 @@ export type Database = {
           end_time: string
           id: string
           reason: string | null
+          reserved_for_client_id: string | null
           slot_date: string
           start_time: string
           status: string
@@ -126,6 +127,7 @@ export type Database = {
           end_time: string
           id?: string
           reason?: string | null
+          reserved_for_client_id?: string | null
           slot_date: string
           start_time: string
           status?: string
@@ -138,6 +140,7 @@ export type Database = {
           end_time?: string
           id?: string
           reason?: string | null
+          reserved_for_client_id?: string | null
           slot_date?: string
           start_time?: string
           status?: string
@@ -192,6 +195,42 @@ export type Database = {
           primary_complaints?: string | null
           return_days?: number | null
           underlying_conditions?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      package_templates: {
+        Row: {
+          active: boolean
+          created_at: string
+          default_price: number
+          default_service: string | null
+          default_sessions: number
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          default_price?: number
+          default_service?: string | null
+          default_sessions?: number
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          default_price?: number
+          default_service?: string | null
+          default_sessions?: number
+          id?: string
+          name?: string
           updated_at?: string
           user_id?: string
         }
@@ -370,6 +409,45 @@ export type Database = {
           media_type?: string
           storage_path?: string
           uploaded_by?: string
+        }
+        Relationships: []
+      }
+      session_plans: {
+        Row: {
+          appointment_id: string | null
+          client_id: string
+          content: string
+          created_at: string
+          id: string
+          notified_at: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          client_id: string
+          content?: string
+          created_at?: string
+          id?: string
+          notified_at?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+          week_start?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          client_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          notified_at?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          week_start?: string
         }
         Relationships: []
       }
