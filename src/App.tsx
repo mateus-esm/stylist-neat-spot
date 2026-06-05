@@ -81,7 +81,6 @@ const App = () => (
               <Route path="/pacotes" element={<ProtectedRoute allow="admin"><AppLayout><Packages /></AppLayout></ProtectedRoute>} />
               <Route path="/planejamento" element={<ProtectedRoute allow="admin"><AppLayout><Planning /></AppLayout></ProtectedRoute>} />
               <Route path="/configuracoes" element={<ProtectedRoute allow="admin"><AppLayout><Settings /></AppLayout></ProtectedRoute>} />
-              <Route path="/disponibilidade" element={<ProtectedRoute allow="admin"><AppLayout><Availability /></AppLayout></ProtectedRoute>} />
 
               {/* Patient */}
               <Route path="/meu-app" element={<ProtectedRoute allow="patient"><AppLayout><PatientPortal /></AppLayout></ProtectedRoute>} />
