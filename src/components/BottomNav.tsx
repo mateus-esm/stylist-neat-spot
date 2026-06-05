@@ -1,4 +1,4 @@
-import { CalendarDays, Users, LineChart, Package, LayoutDashboard, Settings as SettingsIcon } from "lucide-react";
+import { CalendarDays, Users, LineChart, Package, LayoutDashboard, Settings as SettingsIcon, ClipboardList } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useRole } from "@/hooks/useRole";
@@ -7,7 +7,8 @@ const adminTabs = [
   { path: "/", icon: CalendarDays, label: "Agenda" },
   { path: "/pacientes", icon: Users, label: "Pacientes" },
   { path: "/pacotes", icon: Package, label: "Pacotes" },
-  { path: "/financeiro", icon: LineChart, label: "Financeiro" },
+  { path: "/planejamento", icon: ClipboardList, label: "Planos" },
+  { path: "/financeiro", icon: LineChart, label: "Financ." },
   { path: "/configuracoes", icon: SettingsIcon, label: "Config" },
 ];
 
