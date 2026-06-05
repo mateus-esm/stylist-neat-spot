@@ -144,6 +144,7 @@ const Availability = () => {
           ))
         )}
       </main>
+      <BulkSlotsDialog open={bulkOpen} onOpenChange={setBulkOpen} onCreated={fetchSlots} />
     </div>
   );
 };
