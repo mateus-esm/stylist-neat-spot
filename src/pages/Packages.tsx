@@ -280,6 +280,35 @@ const Packages = () => {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label>Modelo (pacote-padrão)</Label>
+              <Select
+                value={form.template_id}
+                onValueChange={(v) => {
+                  if (v === "custom") {
+                    setForm({ ...form, template_id: v });
+                  } else {
+                    const t = templates.find((x) => x.id === v);
+                    if (t) {
+                      setForm({
+                        ...form,
+                        template_id: v,
+                        name: t.name,
+                        service: t.default_service || form.service,
+                        total_sessions: String(t.default_sessions),
+                        price: String(t.default_price),
+                      });
+                    }
+                  }
+                }}
+              >
+                <SelectTrigger className="rounded-sm"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">Personalizado</SelectItem>
+                  {templates.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>Nome do pacote</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-sm" placeholder="Ex: Reabilitação LCA - 10 sessões" />
             </div>
