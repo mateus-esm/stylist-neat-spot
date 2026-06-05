@@ -12,14 +12,18 @@ echo "Tag: $TAG"
 
 # 1) Patient (clients) + package (4 sessions, R$ 400, paid today)
 CLIENT_ID=$(psql -tA -c "
-  INSERT INTO public.clients (user_id, name, phone)
-  VALUES ('$ADMIN_UID', '$TAG paciente', '11999999999') RETURNING id;")
+  WITH ins AS (
+    INSERT INTO public.clients (user_id, name, phone)
+    VALUES ('$ADMIN_UID', '$TAG paciente', '11999999999') RETURNING id
+  ) SELECT id FROM ins;")
 echo "Client: $CLIENT_ID"
 
 PKG_ID=$(psql -tA -c "
-  INSERT INTO public.patient_packages (user_id, client_id, name, service, total_sessions, price, payment_status, paid_at, status, started_at)
-  VALUES ('$ADMIN_UID','$CLIENT_ID','$TAG LCA','LCA',4,400,'pago',now(),'ativo',now())
-  RETURNING id;")
+  WITH ins AS (
+    INSERT INTO public.patient_packages (user_id, client_id, name, service, total_sessions, price, payment_status, paid_at, status, started_at)
+    VALUES ('$ADMIN_UID','$CLIENT_ID','$TAG LCA','LCA',4,400,'pago',now(),'ativo',now())
+    RETURNING id
+  ) SELECT id FROM ins;")
 echo "Package: $PKG_ID"
 
 # 2) 4 appointments today linked to the package (price 0, paid)
