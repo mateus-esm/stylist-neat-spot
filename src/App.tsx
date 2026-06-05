@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import Availability from "./pages/Availability";
 import Settings from "./pages/Settings";
 import Packages from "./pages/Packages";
+import Planning from "./pages/Planning";
 import PatientPortal from "./pages/PatientPortal";
 import PatientSession from "./pages/PatientSession";
 import AcceptInvite from "./pages/AcceptInvite";
