@@ -78,6 +78,9 @@ const Availability = () => {
       </header>
 
       <main className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
+        <Button onClick={() => setBulkOpen(true)} variant="outline" className="w-full rounded-sm gap-2">
+          <Layers className="h-4 w-4" /> Abrir horários em lote
+        </Button>
         <Card className="rounded-sm">
           <CardContent className="p-4">
             <form onSubmit={addSlot} className="space-y-3">
