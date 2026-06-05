@@ -1,79 +1,117 @@
-import { useState, useEffect } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
+import { useEffect, useMemo, useState } from "react";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { TrendingUp, AlertCircle, CheckCircle2, Package } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 
 const db = supabase as any;
 
+type Period = "day" | "week" | "month" | "custom";
+
 const Financial = () => {
   const { user } = useAuth();
   const [appts, setAppts] = useState<any[]>([]);
   const [packages, setPackages] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
 
-  useEffect(() => { if (user) fetchData(); }, [user]);
+  const [period, setPeriod] = useState<Period>("month");
+  const [customFrom, setCustomFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
+  const [customTo, setCustomTo] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
+  const [filterClient, setFilterClient] = useState<string>("all");
+  const [filterService, setFilterService] = useState<string>("all");
 
-  const fetchData = async () => {
-    const monthStart = format(startOfMonth(new Date()), "yyyy-MM-dd");
-    const monthEnd = format(endOfMonth(new Date()), "yyyy-MM-dd");
-    const [{ data: a }, { data: p }] = await Promise.all([
-      db.from("appointments")
-        .select("appointment_date, price, status, payment_status, package_id")
-        .gte("appointment_date", monthStart)
-        .lte("appointment_date", monthEnd),
-      db.from("patient_packages").select("*"),
-    ]);
-    setAppts(a || []);
-    setPackages(p || []);
-  };
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const [{ data: a }, { data: p }, { data: c }] = await Promise.all([
+        db.from("appointments").select("appointment_date, price, status, payment_status, package_id, client_id, service"),
+        db.from("patient_packages").select("*"),
+        db.from("clients").select("id, name").order("name"),
+      ]);
+      setAppts(a || []);
+      setPackages(p || []);
+      setClients(c || []);
+    })();
+  }, [user]);
 
-  const monthStart = startOfMonth(new Date());
-  const monthEnd = endOfMonth(new Date());
+  const range = useMemo(() => {
+    const now = new Date();
+    if (period === "day") return { from: startOfDay(now), to: endOfDay(now) };
+    if (period === "week") return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
+    if (period === "month") return { from: startOfMonth(now), to: endOfMonth(now) };
+    return { from: new Date(customFrom + "T00:00:00"), to: new Date(customTo + "T23:59:59") };
+  }, [period, customFrom, customTo]);
 
-  // Avulsos atendidos no mês (sem package_id)
-  const completedAvulsos = appts.filter((a) => a.status === "atendido" && !a.package_id);
+  const fromStr = format(range.from, "yyyy-MM-dd");
+  const toStr = format(range.to, "yyyy-MM-dd");
 
-  // Pacotes pagos no mês corrente
-  const pkgsPaidThisMonth = packages.filter((p) => {
+  // Filtered avulsos (no package): always by appointment_date
+  const filteredAvulsos = useMemo(() => appts.filter((a) => {
+    if (a.package_id) return false;
+    if (a.appointment_date < fromStr || a.appointment_date > toStr) return false;
+    if (filterClient !== "all" && a.client_id !== filterClient) return false;
+    if (filterService !== "all" && a.service !== filterService) return false;
+    return true;
+  }), [appts, fromStr, toStr, filterClient, filterService]);
+
+  // Filtered packages: paid_at inside range OR active pending (for pending bucket)
+  const paidPackagesInRange = useMemo(() => packages.filter((p) => {
     if (p.payment_status !== "pago" || !p.paid_at) return false;
-    const d = new Date(p.paid_at);
-    return d >= monthStart && d <= monthEnd;
-  });
+    const d = format(new Date(p.paid_at), "yyyy-MM-dd");
+    if (d < fromStr || d > toStr) return false;
+    if (filterClient !== "all" && p.client_id !== filterClient) return false;
+    if (filterService !== "all" && p.service !== filterService) return false;
+    return true;
+  }), [packages, fromStr, toStr, filterClient, filterService]);
 
-  const revenueAvulsoPaid = completedAvulsos
-    .filter((a) => a.payment_status === "pago")
-    .reduce((s, a) => s + Number(a.price), 0);
-  const revenuePackagesPaid = pkgsPaidThisMonth.reduce((s, p) => s + Number(p.price), 0);
+  const pendingPackages = useMemo(() => packages.filter((p) => {
+    if (p.status !== "ativo" || p.payment_status !== "pendente") return false;
+    if (filterClient !== "all" && p.client_id !== filterClient) return false;
+    if (filterService !== "all" && p.service !== filterService) return false;
+    return true;
+  }), [packages, filterClient, filterService]);
+
+  const completedAvulsos = filteredAvulsos.filter((a) => a.status === "atendido");
+  const revenueAvulsoPaid = completedAvulsos.filter((a) => a.payment_status === "pago").reduce((s, a) => s + Number(a.price), 0);
+  const revenuePackagesPaid = paidPackagesInRange.reduce((s, p) => s + Number(p.price), 0);
   const grossRevenue = revenueAvulsoPaid + revenuePackagesPaid;
 
-  const pendingAvulso = completedAvulsos
-    .filter((a) => a.payment_status === "pendente")
-    .reduce((s, a) => s + Number(a.price), 0);
-  const pendingPackages = packages
-    .filter((p) => p.status === "ativo" && p.payment_status === "pendente")
-    .reduce((s, p) => s + Number(p.price), 0);
-  const pending = pendingAvulso + pendingPackages;
+  const pendingAvulso = completedAvulsos.filter((a) => a.payment_status === "pendente").reduce((s, a) => s + Number(a.price), 0);
+  const pendingPkg = pendingPackages.reduce((s, p) => s + Number(p.price), 0);
+  const pending = pendingAvulso + pendingPkg;
 
   const activePackages = packages.filter((p) => p.status === "ativo").length;
-  const totalServices = completedAvulsos.length + appts.filter((a) => a.status === "atendido" && a.package_id).length;
-  const avgTicket = totalServices > 0 ? grossRevenue / Math.max(completedAvulsos.length + pkgsPaidThisMonth.length, 1) : 0;
+  const sessionsDone = completedAvulsos.length + appts.filter((a) => a.status === "atendido" && a.package_id && a.appointment_date >= fromStr && a.appointment_date <= toStr).length;
+  const ticketBaseCount = completedAvulsos.length + paidPackagesInRange.length;
+  const avgTicket = ticketBaseCount > 0 ? grossRevenue / ticketBaseCount : 0;
 
-  // Chart: dia a dia (avulsos pagos pelo dia da sessão + pacotes pelo paid_at)
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const chartData = days.map((d) => {
-    const ds = format(d, "yyyy-MM-dd");
-    const avulso = completedAvulsos
-      .filter((a) => a.payment_status === "pago" && a.appointment_date === ds)
-      .reduce((s, a) => s + Number(a.price), 0);
-    const pacote = pkgsPaidThisMonth
-      .filter((p) => format(new Date(p.paid_at), "yyyy-MM-dd") === ds)
-      .reduce((s, p) => s + Number(p.price), 0);
-    return { day: format(d, "dd"), value: Number((avulso + pacote).toFixed(2)) };
-  });
+  const services = useMemo(() => {
+    const set = new Set<string>();
+    appts.forEach((a) => a.service && set.add(a.service));
+    packages.forEach((p) => p.service && set.add(p.service));
+    return Array.from(set).sort();
+  }, [appts, packages]);
+
+  const chartData = useMemo(() => {
+    const days = eachDayOfInterval({ start: range.from, end: range.to });
+    return days.map((d) => {
+      const ds = format(d, "yyyy-MM-dd");
+      const avulso = completedAvulsos
+        .filter((a) => a.payment_status === "pago" && a.appointment_date === ds)
+        .reduce((s, a) => s + Number(a.price), 0);
+      const pacote = paidPackagesInRange
+        .filter((p) => format(new Date(p.paid_at), "yyyy-MM-dd") === ds)
+        .reduce((s, p) => s + Number(p.price), 0);
+      return { day: format(d, "dd/MM"), value: Number((avulso + pacote).toFixed(2)) };
+    });
+  }, [range, completedAvulsos, paidPackagesInRange]);
 
   return (
     <div className="pb-24">
@@ -81,18 +119,69 @@ const Financial = () => {
         <div className="mx-auto max-w-3xl flex items-center justify-between">
           <BrandLogo size="sm" />
           <p className="text-xs uppercase tracking-wider text-muted-foreground capitalize">
-            {format(new Date(), "MMMM yyyy", { locale: ptBR })}
+            {format(range.from, "dd MMM", { locale: ptBR })} — {format(range.to, "dd MMM", { locale: ptBR })}
           </p>
         </div>
       </header>
 
       <div className="mx-auto max-w-3xl space-y-4 px-4 pt-4">
+        <Card className="rounded-sm">
+          <CardContent className="p-3 space-y-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase tracking-wider">Período</Label>
+                <Select value={period} onValueChange={(v: any) => setPeriod(v)}>
+                  <SelectTrigger className="rounded-sm h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="day">Dia</SelectItem>
+                    <SelectItem value="week">Semana</SelectItem>
+                    <SelectItem value="month">Mês</SelectItem>
+                    <SelectItem value="custom">Personalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase tracking-wider">Paciente</Label>
+                <Select value={filterClient} onValueChange={setFilterClient}>
+                  <SelectTrigger className="rounded-sm h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase tracking-wider">Serviço/Pacote</Label>
+                <Select value={filterService} onValueChange={setFilterService}>
+                  <SelectTrigger className="rounded-sm h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {services.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {period === "custom" && (
+                <div className="grid grid-cols-2 gap-1 col-span-2 sm:col-span-1">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase tracking-wider">De</Label>
+                    <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-sm h-9" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase tracking-wider">Até</Label>
+                    <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="rounded-sm h-9" />
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="rounded-sm border-border">
           <CardContent className="p-6">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Receita recebida no mês</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Receita recebida</p>
             <p className="mt-1 text-4xl font-semibold">R$ {grossRevenue.toFixed(2)}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {totalServices} sessão(ões) realizada(s) · Ticket médio R$ {avgTicket.toFixed(2)}
+              {sessionsDone} sessão(ões) · Ticket médio R$ {avgTicket.toFixed(2)}
             </p>
             <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
               <div className="rounded-sm bg-secondary/40 p-2">
@@ -152,7 +241,6 @@ const Financial = () => {
                   cursor={{ fill: "hsl(var(--secondary))" }}
                   contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 4, fontSize: 12 }}
                   formatter={(v: any) => [`R$ ${Number(v).toFixed(2)}`, "Receita"]}
-                  labelFormatter={(l) => `Dia ${l}`}
                 />
                 <Bar dataKey="value" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
               </BarChart>

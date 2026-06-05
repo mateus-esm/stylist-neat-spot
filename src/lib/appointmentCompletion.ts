@@ -11,19 +11,24 @@ const db = supabase as any;
 export async function completeAppointment(appointmentId: string): Promise<{ error?: string }> {
   const { data: appt, error: fetchErr } = await db
     .from("appointments")
-    .select("id, status, package_id, package_session_index")
+    .select("id, status, package_id, package_session_index, payment_status")
     .eq("id", appointmentId)
     .maybeSingle();
 
   if (fetchErr) return { error: fetchErr.message };
   if (!appt) return { error: "Sessão não encontrada" };
 
-  // Always set status to atendido
+  // Update status. For avulsos (no package), mark as paid too —
+  // "atendido = recebido" in this clinic; package sessions don't touch payment.
   const wasAlreadyDone = appt.status === "atendido";
   if (!wasAlreadyDone) {
+    const update: any = { status: "atendido" };
+    if (!appt.package_id && appt.payment_status !== "pago") {
+      update.payment_status = "pago";
+    }
     const { error } = await db
       .from("appointments")
-      .update({ status: "atendido" })
+      .update(update)
       .eq("id", appointmentId);
     if (error) return { error: error.message };
   }

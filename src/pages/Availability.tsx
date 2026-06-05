@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, CalendarClock } from "lucide-react";
+import { Plus, Trash2, CalendarClock, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/BrandLogo";
+import BulkSlotsDialog from "@/components/BulkSlotsDialog";
 
 const db = supabase as any;
 
@@ -24,6 +25,7 @@ const Availability = () => {
   const [end, setEnd] = useState("09:00");
   const [status, setStatus] = useState<"aberto" | "bloqueado">("aberto");
   const [reason, setReason] = useState("");
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const fetchSlots = async () => {
     const { data } = await db
@@ -76,6 +78,9 @@ const Availability = () => {
       </header>
 
       <main className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
+        <Button onClick={() => setBulkOpen(true)} variant="outline" className="w-full rounded-sm gap-2">
+          <Layers className="h-4 w-4" /> Abrir horários em lote
+        </Button>
         <Card className="rounded-sm">
           <CardContent className="p-4">
             <form onSubmit={addSlot} className="space-y-3">
@@ -139,6 +144,7 @@ const Availability = () => {
           ))
         )}
       </main>
+      <BulkSlotsDialog open={bulkOpen} onOpenChange={setBulkOpen} onCreated={fetchSlots} />
     </div>
   );
 };

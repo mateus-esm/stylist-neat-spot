@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import Availability from "./pages/Availability";
 import Settings from "./pages/Settings";
 import Packages from "./pages/Packages";
+import Planning from "./pages/Planning";
 import PatientPortal from "./pages/PatientPortal";
 import PatientSession from "./pages/PatientSession";
 import AcceptInvite from "./pages/AcceptInvite";
@@ -78,6 +79,7 @@ const App = () => (
               <Route path="/financeiro" element={<ProtectedRoute allow="admin"><AppLayout><Financial /></AppLayout></ProtectedRoute>} />
               <Route path="/disponibilidade" element={<ProtectedRoute allow="admin"><AppLayout><Availability /></AppLayout></ProtectedRoute>} />
               <Route path="/pacotes" element={<ProtectedRoute allow="admin"><AppLayout><Packages /></AppLayout></ProtectedRoute>} />
+              <Route path="/planejamento" element={<ProtectedRoute allow="admin"><AppLayout><Planning /></AppLayout></ProtectedRoute>} />
               <Route path="/configuracoes" element={<ProtectedRoute allow="admin"><AppLayout><Settings /></AppLayout></ProtectedRoute>} />
 
               {/* Patient */}
