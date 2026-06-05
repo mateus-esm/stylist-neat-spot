@@ -138,7 +138,7 @@ const Packages = () => {
     if (error) return toast.error(error.message);
     toast.success("Pacote criado");
     setOpen(false);
-    setForm({ client_id: "", name: "", service: "", total_sessions: "10", price: "0", payment_status: "pendente" });
+    setForm({ client_id: "", template_id: "custom", name: "", service: "", total_sessions: "10", price: "0", payment_status: "pendente" });
     load();
   };
 
