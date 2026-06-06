@@ -24,6 +24,9 @@ const Planning = () => {
   const [weekStart, setWeekStart] = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd"));
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [exercises, setExercises] = useState("");
+  const [scheduling, setScheduling] = useState("");
+  const [tips, setTips] = useState("");
 
   const load = async () => {
     const [{ data: c }, { data: p }] = await Promise.all([
