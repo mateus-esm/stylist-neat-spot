@@ -62,9 +62,16 @@ const Planning = () => {
     if (!phone) return toast.error("Paciente sem telefone");
     const full = phone.startsWith("55") ? phone : `55${phone}`;
     const wk = format(new Date(plan.week_start + "T12:00:00"), "dd/MM");
-    const msg = encodeURIComponent(
-      `Olá ${c.name}! Seu plano da semana de ${wk}:\n\n*${plan.title}*\n${plan.content}\n\nNos vemos em breve — Lucas Rocha Fisio`
-    );
+    const parts = [
+      `Olá ${c.name}! Seu plano da semana de ${wk}:`,
+      `*${plan.title}*`,
+      plan.content,
+      plan.exercises ? `*Exercícios:*\n${plan.exercises}` : "",
+      plan.scheduling ? `*Agenda:*\n${plan.scheduling}` : "",
+      plan.tips ? `*Dicas:*\n${plan.tips}` : "",
+      `Nos vemos em breve — Lucas Rocha Fisio`,
+    ].filter(Boolean).join("\n\n");
+    const msg = encodeURIComponent(parts);
     window.open(`https://wa.me/${full}?text=${msg}`, "_blank");
     await db.from("session_plans").update({ notified_at: new Date().toISOString() }).eq("id", plan.id);
     load();
