@@ -43,10 +43,11 @@ const Planning = () => {
     if (!user || !clientId || !title) return toast.error("Paciente e título são obrigatórios");
     const { error } = await db.from("session_plans").insert({
       user_id: user.id, client_id: clientId, week_start: weekStart, title, content,
+      exercises, scheduling, tips,
     });
     if (error) return toast.error(error.message);
     toast.success("Plano salvo");
-    setTitle(""); setContent("");
+    setTitle(""); setContent(""); setExercises(""); setScheduling(""); setTips("");
     load();
   };
 
