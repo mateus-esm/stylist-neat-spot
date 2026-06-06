@@ -112,14 +112,24 @@ const Planning = () => {
               <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Foco em fortalecimento posterior" className="rounded-sm" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Conteúdo do plano</Label>
-              <Textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                rows={5}
-                placeholder="Objetivos da semana, exercícios prioritários, observações para o paciente..."
-                className="rounded-sm"
-              />
+              <Label className="text-xs">Objetivos / conteúdo geral</Label>
+              <Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3}
+                placeholder="Objetivos da semana, observações gerais..." className="rounded-sm" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Exercícios da sessão</Label>
+              <Textarea value={exercises} onChange={(e) => setExercises(e.target.value)} rows={3}
+                placeholder="Ex: Agachamento 3x12, Ponte 3x15, Prancha 3x30s..." className="rounded-sm" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Agenda de sessões</Label>
+              <Textarea value={scheduling} onChange={(e) => setScheduling(e.target.value)} rows={2}
+                placeholder="Ex: Seg 8h, Qua 8h, Sex 18h" className="rounded-sm" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Dicas / orientações</Label>
+              <Textarea value={tips} onChange={(e) => setTips(e.target.value)} rows={2}
+                placeholder="Hidratação, sono, alongamento diário..." className="rounded-sm" />
             </div>
             <Button onClick={save} className="w-full rounded-sm">Salvar plano</Button>
           </CardContent>
