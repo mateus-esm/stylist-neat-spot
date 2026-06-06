@@ -152,6 +152,9 @@ const Planning = () => {
                   {p.notified_at && <Badge variant="outline" className="rounded-sm text-[10px]">Notificado</Badge>}
                 </div>
                 {p.content && <p className="text-sm whitespace-pre-wrap text-muted-foreground">{p.content}</p>}
+                {p.exercises && <div className="text-xs"><span className="font-semibold">Exercícios: </span><span className="whitespace-pre-wrap text-muted-foreground">{p.exercises}</span></div>}
+                {p.scheduling && <div className="text-xs"><span className="font-semibold">Agenda: </span><span className="whitespace-pre-wrap text-muted-foreground">{p.scheduling}</span></div>}
+                {p.tips && <div className="text-xs"><span className="font-semibold">Dicas: </span><span className="whitespace-pre-wrap text-muted-foreground">{p.tips}</span></div>}
                 <div className="grid grid-cols-2 gap-2">
                   <Button onClick={() => notify(p)} variant="outline" size="sm" className="rounded-sm gap-2">
                     <MessageCircle className="h-3.5 w-3.5" /> Notificar WhatsApp
