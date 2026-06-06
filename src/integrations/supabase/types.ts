@@ -418,8 +418,11 @@ export type Database = {
           client_id: string
           content: string
           created_at: string
+          exercises: string | null
           id: string
           notified_at: string | null
+          scheduling: string | null
+          tips: string | null
           title: string
           updated_at: string
           user_id: string
@@ -430,8 +433,11 @@ export type Database = {
           client_id: string
           content?: string
           created_at?: string
+          exercises?: string | null
           id?: string
           notified_at?: string | null
+          scheduling?: string | null
+          tips?: string | null
           title: string
           updated_at?: string
           user_id: string
@@ -442,8 +448,11 @@ export type Database = {
           client_id?: string
           content?: string
           created_at?: string
+          exercises?: string | null
           id?: string
           notified_at?: string | null
+          scheduling?: string | null
+          tips?: string | null
           title?: string
           updated_at?: string
           user_id?: string
