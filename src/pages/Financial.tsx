@@ -63,8 +63,10 @@ const Financial = () => {
 
   // Filtered packages: paid_at inside range OR active pending (for pending bucket)
   const paidPackagesInRange = useMemo(() => packages.filter((p) => {
-    if (p.payment_status !== "pago" || !p.paid_at) return false;
-    const d = format(new Date(p.paid_at), "yyyy-MM-dd");
+    if (p.payment_status !== "pago") return false;
+    const ref = p.paid_at || p.created_at;
+    if (!ref) return false;
+    const d = format(new Date(ref), "yyyy-MM-dd");
     if (d < fromStr || d > toStr) return false;
     if (filterClient !== "all" && p.client_id !== filterClient) return false;
     if (filterService !== "all" && p.service !== filterService) return false;
