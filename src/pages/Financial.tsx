@@ -109,7 +109,7 @@ const Financial = () => {
         .filter((a) => a.payment_status === "pago" && a.appointment_date === ds)
         .reduce((s, a) => s + Number(a.price), 0);
       const pacote = paidPackagesInRange
-        .filter((p) => format(new Date(p.paid_at), "yyyy-MM-dd") === ds)
+        .filter((p) => format(new Date(p.paid_at || p.created_at), "yyyy-MM-dd") === ds)
         .reduce((s, p) => s + Number(p.price), 0);
       return { day: format(d, "dd/MM"), value: Number((avulso + pacote).toFixed(2)) };
     });
