@@ -13,7 +13,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 
 const db = supabase as any;
 
-type Period = "day" | "week" | "month" | "custom";
+type Period = "all" | "day" | "week" | "month" | "custom";
 
 const Financial = () => {
   const { user } = useAuth();
@@ -21,7 +21,7 @@ const Financial = () => {
   const [packages, setPackages] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
 
-  const [period, setPeriod] = useState<Period>("month");
+  const [period, setPeriod] = useState<Period>("all");
   const [customFrom, setCustomFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customTo, setCustomTo] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [filterClient, setFilterClient] = useState<string>("all");
@@ -43,11 +43,23 @@ const Financial = () => {
 
   const range = useMemo(() => {
     const now = new Date();
+    if (period === "all") {
+      const refs = [
+        ...appts.map((a) => a.appointment_date).filter(Boolean).map((d) => new Date(`${d}T00:00:00`)),
+        ...packages.map((p) => p.paid_at || p.created_at).filter(Boolean).map((d) => new Date(d)),
+      ].filter((d) => !Number.isNaN(d.getTime()));
+
+      const from = refs.length
+        ? new Date(Math.min(...refs.map((d) => d.getTime())))
+        : startOfMonth(now);
+
+      return { from: startOfDay(from), to: endOfDay(now) };
+    }
     if (period === "day") return { from: startOfDay(now), to: endOfDay(now) };
     if (period === "week") return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
     if (period === "month") return { from: startOfMonth(now), to: endOfMonth(now) };
     return { from: new Date(customFrom + "T00:00:00"), to: new Date(customTo + "T23:59:59") };
-  }, [period, customFrom, customTo]);
+  }, [period, customFrom, customTo, appts, packages]);
 
   const fromStr = format(range.from, "yyyy-MM-dd");
   const toStr = format(range.to, "yyyy-MM-dd");
@@ -135,6 +147,7 @@ const Financial = () => {
                 <Select value={period} onValueChange={(v: any) => setPeriod(v)}>
                   <SelectTrigger className="rounded-sm h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="all">Tudo</SelectItem>
                     <SelectItem value="day">Dia</SelectItem>
                     <SelectItem value="week">Semana</SelectItem>
                     <SelectItem value="month">Mês</SelectItem>
