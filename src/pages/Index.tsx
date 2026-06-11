@@ -28,11 +28,18 @@ const statusBg: Record<string, string> = {
   cancelado: "bg-muted/50 border-l-muted",
 };
 
+const slotBg: Record<string, string> = {
+  aberto: "border-primary/40 bg-primary/10 text-foreground",
+  reservado: "border-warning/50 bg-warning/10 text-foreground",
+  bloqueado: "border-border bg-muted/40 text-muted-foreground",
+};
+
 const Index = () => {
   const { user, signOut } = useAuth();
   const [view, setView] = useState<View>("day");
   const [anchorDate, setAnchorDate] = useState(new Date());
   const [appointments, setAppointments] = useState<any[]>([]);
+  const [slots, setSlots] = useState<any[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [selected, setSelected] = useState<any>(null);
@@ -50,13 +57,26 @@ const Index = () => {
 
   const fetchAppointments = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("appointments")
-      .select("*")
-      .gte("appointment_date", format(range.start, "yyyy-MM-dd"))
-      .lte("appointment_date", format(range.end, "yyyy-MM-dd"))
-      .order("appointment_time");
-    if (data) setAppointments(data);
+    const from = format(range.start, "yyyy-MM-dd");
+    const to = format(range.end, "yyyy-MM-dd");
+
+    const [{ data: appointmentRows }, { data: slotRows }] = await Promise.all([
+      supabase
+        .from("appointments")
+        .select("*")
+        .gte("appointment_date", from)
+        .lte("appointment_date", to)
+        .order("appointment_time"),
+      supabase
+        .from("availability_slots")
+        .select("*")
+        .gte("slot_date", from)
+        .lte("slot_date", to)
+        .order("start_time"),
+    ]);
+
+    setAppointments(appointmentRows || []);
+    setSlots(slotRows || []);
   };
 
   useEffect(() => {
@@ -147,12 +167,13 @@ const Index = () => {
 
       <div className="mx-auto max-w-3xl px-4 pt-5">
         <PendingRequestsBanner onChange={fetchAppointments} />
-        {view === "day" && <DayView date={anchorDate} appointments={appointments} onSelect={openSheet} />}
-        {view === "week" && <WeekView startDate={range.start} appointments={appointments} onSelect={openSheet} />}
+        {view === "day" && <DayView date={anchorDate} appointments={appointments} slots={slots} onSelect={openSheet} />}
+        {view === "week" && <WeekView startDate={range.start} appointments={appointments} slots={slots} onSelect={openSheet} />}
         {view === "month" && (
           <MonthView
             anchor={anchorDate}
             appointments={appointments}
+            slots={slots}
             onSelectDay={(d) => { setAnchorDate(d); setView("day"); }}
           />
         )}
@@ -196,19 +217,20 @@ const Index = () => {
 };
 
 // ── DAY VIEW (timeline) ─────────────────────────────────────
-const DayView = ({ date, appointments, onSelect }: any) => {
+const DayView = ({ date, appointments, slots, onSelect }: any) => {
   const dayStr = format(date, "yyyy-MM-dd");
   const dayAppts = appointments.filter((a: any) => a.appointment_date === dayStr);
+  const daySlots = slots.filter((s: any) => s.slot_date === dayStr);
   const hours = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
 
-  const apptStyle = (a: any) => {
-    const [h, m] = a.appointment_time.split(":").map(Number);
+  const timeBlockStyle = (startTime: string, durationMin: number) => {
+    const [h, m] = startTime.split(":").map(Number);
     const top = (h - START_HOUR) * HOUR_HEIGHT + (m / 60) * HOUR_HEIGHT;
-    const height = ((a.duration_min || 30) / 60) * HOUR_HEIGHT;
+    const height = (durationMin / 60) * HOUR_HEIGHT;
     return { top, height: Math.max(height, 36) };
   };
 
-  if (dayAppts.length === 0) {
+  if (dayAppts.length === 0 && daySlots.length === 0) {
     return (
       <Card className="border-dashed border-border bg-card/50">
         <CardContent className="py-12 text-center text-muted-foreground">
@@ -235,17 +257,42 @@ const DayView = ({ date, appointments, onSelect }: any) => {
           </div>
         ))}
 
-        {/* Appointments */}
+        <div className="absolute inset-y-0 left-12 right-1">
+          {daySlots.map((slot: any) => {
+            const [startHour, startMin] = slot.start_time.split(":").map(Number);
+            const [endHour, endMin] = slot.end_time.split(":").map(Number);
+            const durationMin = endHour * 60 + endMin - (startHour * 60 + startMin);
+            const s = timeBlockStyle(slot.start_time, Math.max(durationMin, 30));
+
+            return (
+              <div
+                key={slot.id}
+                className={cn(
+                  "absolute left-0 right-0 rounded-sm border border-dashed px-3 py-2 text-left",
+                  slotBg[slot.status] || slotBg.aberto
+                )}
+                style={{ top: s.top, height: s.height }}
+              >
+                <div className="flex items-center justify-between gap-2 text-[11px] font-mono-data">
+                  <span className="font-semibold tabular-nums">{slot.start_time?.slice(0, 5)} - {slot.end_time?.slice(0, 5)}</span>
+                  <span className="text-[9px] font-semibold uppercase tracking-wider">{slot.status}</span>
+                </div>
+                <p className="truncate text-xs">{slot.reason || (slot.status === "aberto" ? "Slot disponível" : slot.status === "reservado" ? "Horário reservado" : "Horário bloqueado")}</p>
+              </div>
+            );
+          })}
+        </div>
+
         <div className="absolute inset-y-0 left-12 right-1">
           {dayAppts.map((a: any) => {
-            const s = apptStyle(a);
+            const s = timeBlockStyle(a.appointment_time, a.duration_min || 30);
             const isPkg = !!(a.package_id || a.package_session_index);
             return (
               <button
                 key={a.id}
                 onClick={() => onSelect(a)}
                 className={cn(
-                  "absolute left-0 right-0 overflow-hidden rounded-sm border-l-[3px] px-3 py-2 text-left transition-colors hover:bg-secondary",
+                  "absolute left-0 right-0 z-10 overflow-hidden rounded-sm border-l-[3px] px-3 py-2 text-left transition-colors hover:bg-secondary",
                   statusBg[a.status]
                 )}
                 style={{ top: s.top, height: s.height }}
@@ -278,14 +325,15 @@ const DayView = ({ date, appointments, onSelect }: any) => {
 };
 
 // ── WEEK VIEW ────────────────────────────────────────────────
-const WeekView = ({ startDate, appointments, onSelect }: any) => {
+const WeekView = ({ startDate, appointments, slots, onSelect }: any) => {
   const days = eachDayOfInterval({ start: startDate, end: addDays(startDate, 6) });
 
   return (
     <div className="space-y-2">
       {days.map((d) => {
         const dayStr = format(d, "yyyy-MM-dd");
-        const list = appointments.filter((a: any) => a.appointment_date === dayStr);
+        const appointmentList = appointments.filter((a: any) => a.appointment_date === dayStr);
+        const slotList = slots.filter((s: any) => s.slot_date === dayStr);
         return (
           <Card key={dayStr} className={cn("border-border/60", isToday(d) && "border-primary/40")}>
             <CardContent className="p-3">
@@ -298,13 +346,26 @@ const WeekView = ({ startDate, appointments, onSelect }: any) => {
                     {format(d, "dd")}
                   </span>
                 </div>
-                <span className="text-[10px] text-muted-foreground">{list.length} ag.</span>
+                <span className="text-[10px] text-muted-foreground">{appointmentList.length} ag. · {slotList.length} slots</span>
               </div>
-              {list.length === 0 ? (
-                <p className="py-2 text-xs text-muted-foreground/60">Sem agendamentos</p>
+              {appointmentList.length === 0 && slotList.length === 0 ? (
+                <p className="py-2 text-xs text-muted-foreground/60">Sem agendamentos ou slots</p>
               ) : (
                 <div className="space-y-1.5">
-                  {list.map((a: any) => {
+                  {slotList.map((slot: any) => (
+                    <div
+                      key={slot.id}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-sm border border-dashed px-2 py-1.5 text-left text-xs",
+                        slotBg[slot.status] || slotBg.aberto
+                      )}
+                    >
+                      <span className="font-semibold tabular-nums">{slot.start_time?.slice(0, 5)}</span>
+                      <span className="flex-1 truncate">{slot.reason || "Slot"}</span>
+                      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider">{slot.status}</span>
+                    </div>
+                  ))}
+                  {appointmentList.map((a: any) => {
                     const isPkg = !!(a.package_id || a.package_session_index);
                     return (
                       <button
@@ -340,7 +401,7 @@ const WeekView = ({ startDate, appointments, onSelect }: any) => {
 };
 
 // ── MONTH VIEW ───────────────────────────────────────────────
-const MonthView = ({ anchor, appointments, onSelectDay }: any) => {
+const MonthView = ({ anchor, appointments, slots, onSelectDay }: any) => {
   const monthStart = startOfMonth(anchor);
   const monthEnd = endOfMonth(anchor);
   const weeks = eachWeekOfInterval({ start: monthStart, end: monthEnd }, { weekStartsOn: 1 });
@@ -349,6 +410,10 @@ const MonthView = ({ anchor, appointments, onSelectDay }: any) => {
     acc[a.appointment_date] = (acc[a.appointment_date] || 0) + 1;
     return acc;
   }, {});
+
+  slots.forEach((slot: any) => {
+    countByDay[slot.slot_date] = (countByDay[slot.slot_date] || 0) + 1;
+  });
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card/40 p-3">
