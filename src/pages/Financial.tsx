@@ -113,6 +113,58 @@ const Financial = () => {
     return Array.from(set).sort();
   }, [appts, packages]);
 
+  const clientMap = useMemo(() => Object.fromEntries(clients.map((c) => [c.id, c.name])), [clients]);
+
+  const receivedItems = useMemo(() => {
+    const avulsoItems = completedAvulsos
+      .filter((a) => a.payment_status === "pago")
+      .map((a) => ({
+        id: `appt-${a.client_id}-${a.appointment_date}-${a.service}`,
+        date: a.appointment_date,
+        label: a.service || "Sessão avulsa",
+        clientName: clientMap[a.client_id] || "Paciente",
+        amount: Number(a.price),
+        kind: "Avulso",
+      }));
+
+    const packageItems = paidPackagesInRange.map((p) => ({
+      id: `pkg-${p.id}`,
+      date: format(new Date(p.paid_at || p.created_at), "yyyy-MM-dd"),
+      label: p.name || p.service || "Pacote",
+      clientName: clientMap[p.client_id] || "Paciente",
+      amount: Number(p.price),
+      kind: "Pacote",
+    }));
+
+    return [...packageItems, ...avulsoItems]
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [completedAvulsos, paidPackagesInRange, clientMap]);
+
+  const pendingItems = useMemo(() => {
+    const avulsoItems = completedAvulsos
+      .filter((a) => a.payment_status === "pendente")
+      .map((a) => ({
+        id: `pending-appt-${a.client_id}-${a.appointment_date}-${a.service}`,
+        date: a.appointment_date,
+        label: a.service || "Sessão avulsa",
+        clientName: clientMap[a.client_id] || "Paciente",
+        amount: Number(a.price),
+        kind: "Avulso",
+      }));
+
+    const packageItems = pendingPackages.map((p) => ({
+      id: `pending-pkg-${p.id}`,
+      date: format(new Date(p.created_at), "yyyy-MM-dd"),
+      label: p.name || p.service || "Pacote",
+      clientName: clientMap[p.client_id] || "Paciente",
+      amount: Number(p.price),
+      kind: "Pacote",
+    }));
+
+    return [...packageItems, ...avulsoItems]
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [completedAvulsos, pendingPackages, clientMap]);
+
   const chartData = useMemo(() => {
     const days = eachDayOfInterval({ start: range.from, end: range.to });
     return days.map((d) => {
@@ -262,6 +314,56 @@ const Financial = () => {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <Card className="rounded-sm">
+            <CardContent className="p-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">Entradas recebidas</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{receivedItems.length} lançamento(s)</p>
+              </div>
+              {receivedItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum recebimento no período.</p>
+              ) : (
+                <div className="space-y-2">
+                  {receivedItems.map((item) => (
+                    <div key={item.id} className="flex items-start justify-between gap-3 rounded-sm border border-border/70 p-3">
+                      <div>
+                        <p className="text-sm font-semibold">{item.label}</p>
+                        <p className="text-xs text-muted-foreground">{item.clientName} · {item.kind} · {format(new Date(`${item.date}T12:00:00`), "dd/MM/yyyy")}</p>
+                      </div>
+                      <p className="text-sm font-semibold">R$ {item.amount.toFixed(2)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-sm">
+            <CardContent className="p-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">Em aberto</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{pendingItems.length} lançamento(s)</p>
+              </div>
+              {pendingItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nada pendente agora.</p>
+              ) : (
+                <div className="space-y-2">
+                  {pendingItems.map((item) => (
+                    <div key={item.id} className="flex items-start justify-between gap-3 rounded-sm border border-border/70 p-3">
+                      <div>
+                        <p className="text-sm font-semibold">{item.label}</p>
+                        <p className="text-xs text-muted-foreground">{item.clientName} · {item.kind} · {format(new Date(`${item.date}T12:00:00`), "dd/MM/yyyy")}</p>
+                      </div>
+                      <p className="text-sm font-semibold">R$ {item.amount.toFixed(2)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
