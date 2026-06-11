@@ -118,8 +118,8 @@ const Financial = () => {
   const receivedItems = useMemo(() => {
     const avulsoItems = completedAvulsos
       .filter((a) => a.payment_status === "pago")
-      .map((a) => ({
-        id: `appt-${a.client_id}-${a.appointment_date}-${a.service}`,
+      .map((a, index) => ({
+        id: `appt-${a.client_id}-${a.appointment_date}-${a.service}-${index}`,
         date: a.appointment_date,
         label: a.service || "Sessão avulsa",
         clientName: clientMap[a.client_id] || "Paciente",
@@ -143,8 +143,8 @@ const Financial = () => {
   const pendingItems = useMemo(() => {
     const avulsoItems = completedAvulsos
       .filter((a) => a.payment_status === "pendente")
-      .map((a) => ({
-        id: `pending-appt-${a.client_id}-${a.appointment_date}-${a.service}`,
+      .map((a, index) => ({
+        id: `pending-appt-${a.client_id}-${a.appointment_date}-${a.service}-${index}`,
         date: a.appointment_date,
         label: a.service || "Sessão avulsa",
         clientName: clientMap[a.client_id] || "Paciente",
