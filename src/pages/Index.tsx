@@ -217,7 +217,7 @@ const Index = () => {
 };
 
 // ── DAY VIEW (timeline) ─────────────────────────────────────
-const DayView = ({ date, appointments, slots, onSelect }: any) => {
+const DayView = ({ date, appointments, slots, onSelect, onOpenAvailability }: any) => {
   const dayStr = format(date, "yyyy-MM-dd");
   const dayAppts = appointments.filter((a: any) => a.appointment_date === dayStr);
   const daySlots = slots.filter((s: any) => s.slot_date === dayStr);
@@ -236,6 +236,9 @@ const DayView = ({ date, appointments, slots, onSelect }: any) => {
         <CardContent className="py-12 text-center text-muted-foreground">
           <Clock className="mx-auto mb-2 h-8 w-8 opacity-40" />
           <p className="text-sm">Sem agendamentos para este dia</p>
+          <Button variant="outline" size="sm" className="mt-4 rounded-sm gap-2" onClick={onOpenAvailability}>
+            <CalendarClock className="h-4 w-4" /> Criar slots
+          </Button>
         </CardContent>
       </Card>
     );
