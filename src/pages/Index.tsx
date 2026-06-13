@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { format, addDays, startOfWeek, eachDayOfInterval, startOfMonth, endOfMonth, eachWeekOfInterval, isSameDay, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ChevronLeft, ChevronRight, LogOut, DollarSign, Clock } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, LogOut, DollarSign, Clock, CalendarClock } from "lucide-react";
 import AppointmentForm from "@/components/AppointmentForm";
 import AppointmentSheet from "@/components/AppointmentSheet";
 import EvolutionSheet from "@/components/EvolutionSheet";
@@ -36,6 +37,7 @@ const slotBg: Record<string, string> = {
 
 const Index = () => {
   const { user, signOut } = useAuth();
+  const navigateTo = useNavigate();
   const [view, setView] = useState<View>("day");
   const [anchorDate, setAnchorDate] = useState(new Date());
   const [appointments, setAppointments] = useState<any[]>([]);
@@ -162,12 +164,18 @@ const Index = () => {
               ))}
             </div>
           </div>
+
+          <div className="mt-3 flex justify-end">
+            <Button variant="outline" size="sm" className="rounded-sm gap-2" onClick={() => navigateTo("/disponibilidade")}>
+              <CalendarClock className="h-4 w-4" /> Abrir horários
+            </Button>
+          </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-3xl px-4 pt-5">
         <PendingRequestsBanner onChange={fetchAppointments} />
-        {view === "day" && <DayView date={anchorDate} appointments={appointments} slots={slots} onSelect={openSheet} />}
+        {view === "day" && <DayView date={anchorDate} appointments={appointments} slots={slots} onSelect={openSheet} onOpenAvailability={() => navigateTo("/disponibilidade")} />}
         {view === "week" && <WeekView startDate={range.start} appointments={appointments} slots={slots} onSelect={openSheet} />}
         {view === "month" && (
           <MonthView
