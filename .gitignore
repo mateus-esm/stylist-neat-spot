@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Documentos internos de projeto (proposta, discovery, riscos em aberto).
+# Repositorio publico: nao versionar.
+planning/

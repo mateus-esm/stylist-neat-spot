@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
 import soloLogo from "@/assets/solo-ventures-logo.png";
+import oneSymbol from "@/assets/one-symbol.png";
+import oneLockup from "@/assets/one-lockup.png";
 
 interface BrandLogoProps {
   className?: string;
@@ -7,33 +9,54 @@ interface BrandLogoProps {
 }
 
 const sizes = {
-  sm: { mark: "h-6 w-6 text-[10px]", title: "text-sm", sub: "text-[8px]" },
-  md: { mark: "h-8 w-8 text-xs", title: "text-base", sub: "text-[9px]" },
-  lg: { mark: "h-12 w-12 text-base", title: "text-2xl", sub: "text-[10px]" },
+  sm: { mark: "h-7", title: "text-base", sub: "text-[8px]", gap: "gap-2" },
+  md: { mark: "h-9", title: "text-xl", sub: "text-[9px]", gap: "gap-2.5" },
+  lg: { mark: "h-12", title: "text-2xl", sub: "text-[10px]", gap: "gap-3" },
 };
 
+/**
+ * Marca da One Fisioterapia Esportiva.
+ *
+ * `sm` e `md` combinam o símbolo com o logotipo em texto — assim a marca
+ * acompanha o tema claro/escuro e permanece nítida em qualquer tamanho.
+ * `lg` usa o lockup original da identidade, para os momentos de marca
+ * (login e aceite de convite).
+ */
 export const BrandLogo = ({ className, size = "md" }: BrandLogoProps) => {
   const s = sizes[size];
+
+  if (size === "lg") {
+    return (
+      <img
+        src={oneLockup}
+        alt="One Fisioterapia Esportiva"
+        className={cn("h-auto w-40 select-none", className)}
+      />
+    );
+  }
+
   return (
-    <div className={cn("flex items-center gap-2.5", className)}>
-      <div
-        className={cn(
-          "flex items-center justify-center rounded-sm bg-foreground text-background font-display font-semibold",
-          s.mark
-        )}
-      >
-        LR
-      </div>
-      <div className="leading-tight">
-        <p className={cn("font-display font-semibold tracking-tight", s.title)}>
-          Lucas Rocha <span className="text-primary">Fisio</span>
+    <div className={cn("flex items-center", s.gap, className)}>
+      <img
+        src={oneSymbol}
+        alt=""
+        aria-hidden="true"
+        className={cn("w-auto select-none", s.mark)}
+      />
+      <div className="leading-none">
+        <p className={cn("font-display font-bold tracking-tight text-primary", s.title)}>
+          ONE
         </p>
-        {size !== "sm" && (
-          <p className={cn("uppercase tracking-[0.32em] text-muted-foreground", s.sub)}>
-            Clinical Operations
-          </p>
-        )}
+        <p
+          className={cn(
+            "mt-0.5 uppercase tracking-[0.18em] text-muted-foreground",
+            s.sub
+          )}
+        >
+          Fisioterapia Esportiva
+        </p>
       </div>
+      <span className="sr-only">One Fisioterapia Esportiva</span>
     </div>
   );
 };

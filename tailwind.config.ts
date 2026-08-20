@@ -24,6 +24,10 @@ export default {
           foreground: "hsl(var(--primary-foreground))",
           glow: "hsl(var(--primary-glow))",
         },
+        "brand-deep": {
+          DEFAULT: "hsl(var(--brand-deep))",
+          foreground: "hsl(var(--brand-deep-foreground))",
+        },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",

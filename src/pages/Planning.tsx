@@ -69,7 +69,7 @@ const Planning = () => {
       plan.exercises ? `*Exercícios:*\n${plan.exercises}` : "",
       plan.scheduling ? `*Agenda:*\n${plan.scheduling}` : "",
       plan.tips ? `*Dicas:*\n${plan.tips}` : "",
-      `Nos vemos em breve — Lucas Rocha Fisio`,
+      `Nos vemos em breve — One Fisioterapia Esportiva`,
     ].filter(Boolean).join("\n\n");
     const msg = encodeURIComponent(parts);
     window.open(`https://wa.me/${full}?text=${msg}`, "_blank");
