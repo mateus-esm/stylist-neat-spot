@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Fisio App"
+description = "A clinic management workspace for physiotherapists to organize patients, appointments, treatment sessions, planning, finances, and patient access in one place."
+version = "1.0.0"
+id = "artifacts/fisio-app"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25308
+
+[services.development]
+run = "pnpm --filter @workspace/fisio-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/fisio-app", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/fisio-app/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25308"
+BASE_PATH = "/"

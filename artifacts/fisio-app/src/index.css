@@ -1,0 +1,152 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* One Fisioterapia Esportiva — identidade da marca.
+       Ciano #069BD5 (primária), navy #053A5C (profundidade), superfícies azuladas. */
+    --background: 0 0% 100%;
+    --foreground: 203 40% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 203 40% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 203 40% 12%;
+
+    /* Ciano da marca — #069BD5 */
+    --primary: 197 95% 43%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 197 90% 52%;
+
+    /* Navy do símbolo — #053A5C. Superfícies escuras e ênfase sóbria. */
+    --brand-deep: 203 90% 19%;
+    --brand-deep-foreground: 0 0% 100%;
+
+    --secondary: 197 30% 96%;
+    --secondary-foreground: 203 40% 12%;
+
+    --muted: 200 24% 96%;
+    --muted-foreground: 203 14% 42%;
+
+    --accent: 197 95% 43%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 358 72% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 162 72% 32%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 36 94% 46%;
+    --warning-foreground: 203 40% 12%;
+
+    --border: 200 22% 89%;
+    --input: 200 22% 93%;
+    --ring: 197 95% 43%;
+
+    --radius: 0.625rem;
+
+    /* Marca em movimento: degradê sutil herdado do símbolo. */
+    --gradient-brand: linear-gradient(135deg, hsl(197 95% 43%) 0%, hsl(199 92% 32%) 100%);
+    --gradient-card: hsl(0 0% 100%);
+    --shadow-brand: 0 6px 16px -6px hsl(197 95% 43% / 0.38);
+    --shadow-elevated: 0 1px 2px 0 hsl(203 40% 12% / 0.05), 0 4px 12px -2px hsl(203 40% 12% / 0.08);
+  }
+
+  .dark {
+    --background: 203 45% 9%;
+    --foreground: 197 20% 95%;
+
+    --card: 203 40% 12%;
+    --card-foreground: 197 20% 95%;
+
+    --popover: 203 40% 12%;
+    --popover-foreground: 197 20% 95%;
+
+    --primary: 197 90% 52%;
+    --primary-foreground: 203 60% 8%;
+    --primary-glow: 197 90% 62%;
+
+    --brand-deep: 197 20% 95%;
+    --brand-deep-foreground: 203 60% 8%;
+
+    --secondary: 203 32% 17%;
+    --secondary-foreground: 197 20% 95%;
+
+    --muted: 203 30% 16%;
+    --muted-foreground: 200 15% 65%;
+
+    --accent: 197 90% 52%;
+    --accent-foreground: 203 60% 8%;
+
+    --destructive: 358 68% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 162 62% 44%;
+    --success-foreground: 203 60% 8%;
+
+    --warning: 36 88% 58%;
+    --warning-foreground: 203 60% 8%;
+
+    --border: 203 28% 22%;
+    --input: 203 28% 20%;
+    --ring: 197 90% 52%;
+
+    --gradient-brand: linear-gradient(135deg, hsl(197 90% 52%) 0%, hsl(199 85% 38%) 100%);
+    --gradient-card: hsl(203 40% 12%);
+    --shadow-brand: 0 6px 16px -6px hsl(197 90% 52% / 0.42);
+    --shadow-elevated: 0 1px 2px 0 hsl(203 60% 4% / 0.5), 0 4px 12px -2px hsl(203 60% 4% / 0.45);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', 'Inter', sans-serif;
+    letter-spacing: -0.015em;
+    font-weight: 600;
+  }
+
+  .font-mono, .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  .text-gradient-brand {
+    color: hsl(var(--primary));
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
+  }
+  .bg-gradient-brand {
+    background: var(--gradient-brand);
+  }
+  .shadow-brand {
+    box-shadow: var(--shadow-brand);
+  }
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+  .font-display {
+    font-family: 'Poppins', 'Inter', sans-serif;
+    letter-spacing: -0.02em;
+  }
+  .font-mono-data {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+}

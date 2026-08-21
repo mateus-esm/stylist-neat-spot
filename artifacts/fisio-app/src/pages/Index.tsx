@@ -1,0 +1,471 @@
+import { useState, useEffect, useMemo } from "react";
+import { format, addDays, startOfWeek, eachDayOfInterval, startOfMonth, endOfMonth, eachWeekOfInterval, isSameDay, isToday } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Plus, ChevronLeft, ChevronRight, LogOut, DollarSign, Clock, CalendarClock } from "lucide-react";
+import AppointmentForm from "@/components/AppointmentForm";
+import AppointmentSheet from "@/components/AppointmentSheet";
+import EvolutionSheet from "@/components/EvolutionSheet";
+import PendingRequestsBanner from "@/components/PendingRequestsBanner";
+import { BrandLogo } from "@/components/BrandLogo";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { cn } from "@/lib/utils";
+
+type View = "day" | "week" | "month";
+
+const HOUR_HEIGHT = 56; // px per hour
+const START_HOUR = 8;
+const END_HOUR = 21;
+
+const statusBg: Record<string, string> = {
+  agendado: "bg-secondary/80 border-l-muted-foreground",
+  confirmado: "bg-primary/15 border-l-primary",
+  atendido: "bg-success/15 border-l-success",
+  faltou: "bg-destructive/15 border-l-destructive",
+  cancelado: "bg-muted/50 border-l-muted",
+};
+
+const slotBg: Record<string, string> = {
+  aberto: "border-primary/40 bg-primary/10 text-foreground",
+  reservado: "border-warning/50 bg-warning/10 text-foreground",
+  bloqueado: "border-border bg-muted/40 text-muted-foreground",
+};
+
+const Index = () => {
+  const { user, signOut } = useAuth();
+  const navigateTo = useNavigate();
+  const [view, setView] = useState<View>("day");
+  const [anchorDate, setAnchorDate] = useState(new Date());
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [slots, setSlots] = useState<any[]>([]);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const [selected, setSelected] = useState<any>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+
+  const range = useMemo(() => {
+    if (view === "day") return { start: anchorDate, end: anchorDate };
+    if (view === "week") {
+      const s = startOfWeek(anchorDate, { weekStartsOn: 1 });
+      return { start: s, end: addDays(s, 6) };
+    }
+    return { start: startOfMonth(anchorDate), end: endOfMonth(anchorDate) };
+  }, [view, anchorDate]);
+
+  const fetchAppointments = async () => {
+    if (!user) return;
+    const from = format(range.start, "yyyy-MM-dd");
+    const to = format(range.end, "yyyy-MM-dd");
+
+    const [{ data: appointmentRows }, { data: slotRows }] = await Promise.all([
+      supabase
+        .from("appointments")
+        .select("*")
+        .gte("appointment_date", from)
+        .lte("appointment_date", to)
+        .order("appointment_time"),
+      supabase
+        .from("availability_slots")
+        .select("*")
+        .gte("slot_date", from)
+        .lte("slot_date", to)
+        .order("start_time"),
+    ]);
+
+    setAppointments(appointmentRows || []);
+    setSlots(slotRows || []);
+  };
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [user, range.start.toString(), range.end.toString()]);
+
+  const dailyTotal = appointments
+    .filter((a) => a.appointment_date === format(new Date(), "yyyy-MM-dd") && a.status === "atendido")
+    .reduce((s, a) => s + Number(a.price), 0);
+
+  const navigate = (delta: number) => {
+    if (view === "day") setAnchorDate(addDays(anchorDate, delta));
+    else if (view === "week") setAnchorDate(addDays(anchorDate, delta * 7));
+    else {
+      const d = new Date(anchorDate);
+      d.setMonth(d.getMonth() + delta);
+      setAnchorDate(d);
+    }
+  };
+
+  const openSheet = (a: any) => {
+    setSelected(a);
+    setSheetOpen(true);
+  };
+
+  const headerLabel = useMemo(() => {
+    if (view === "day") return format(anchorDate, "EEEE, dd 'de' MMM", { locale: ptBR });
+    if (view === "week") return `${format(range.start, "dd MMM", { locale: ptBR })} – ${format(range.end, "dd MMM", { locale: ptBR })}`;
+    return format(anchorDate, "MMMM yyyy", { locale: ptBR });
+  }, [view, anchorDate, range]);
+
+  return (
+    <div className="pb-24">
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur-xl">
+        <div className="mx-auto max-w-3xl px-4 py-3">
+          <div className="flex items-center justify-between">
+            <BrandLogo size="sm" />
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5">
+                <DollarSign className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-semibold">R$ {dailyTotal.toFixed(2)}</span>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">hoje</span>
+              </div>
+              <ThemeToggle />
+              <Button onClick={signOut} variant="ghost" size="icon" className="h-8 w-8">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="h-8 w-8">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <button
+                onClick={() => setAnchorDate(new Date())}
+                className="px-2 text-sm font-semibold capitalize hover:text-primary"
+              >
+                {headerLabel}
+              </button>
+              <Button variant="ghost" size="icon" onClick={() => navigate(1)} className="h-8 w-8">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* View toggle */}
+            <div className="flex rounded-sm border border-border bg-card p-0.5">
+              {(["day", "week", "month"] as View[]).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className={cn(
+                    "rounded-sm px-3 py-1 text-[11px] font-semibold uppercase tracking-wider transition-colors",
+                    view === v
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {v === "day" ? "Dia" : v === "week" ? "Semana" : "Mês"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 flex justify-end">
+            <Button variant="outline" size="sm" className="rounded-sm gap-2" onClick={() => navigateTo("/disponibilidade")}>
+              <CalendarClock className="h-4 w-4" /> Abrir horários
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-3xl px-4 pt-5">
+        <PendingRequestsBanner onChange={fetchAppointments} />
+        {view === "day" && <DayView date={anchorDate} appointments={appointments} slots={slots} onSelect={openSheet} onOpenAvailability={() => navigateTo("/disponibilidade")} />}
+        {view === "week" && <WeekView startDate={range.start} appointments={appointments} slots={slots} onSelect={openSheet} />}
+        {view === "month" && (
+          <MonthView
+            anchor={anchorDate}
+            appointments={appointments}
+            slots={slots}
+            onSelectDay={(d) => { setAnchorDate(d); setView("day"); }}
+          />
+        )}
+      </div>
+
+      {/* FAB */}
+      <Button
+        onClick={() => { setEditing(null); setFormOpen(true); }}
+        className="fixed bottom-20 right-4 h-14 w-14 rounded-full bg-gradient-brand text-primary-foreground shadow-brand hover:opacity-90"
+        size="icon"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
+
+      <AppointmentForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        onSuccess={fetchAppointments}
+        appointment={editing}
+        selectedDate={format(anchorDate, "yyyy-MM-dd")}
+      />
+
+      <AppointmentSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        appointment={selected}
+        onComplete={fetchAppointments}
+        onEdit={() => { setEditing(selected); setSheetOpen(false); setFormOpen(true); }}
+        onLog={() => { setSheetOpen(false); setLogOpen(true); }}
+        onRefresh={fetchAppointments}
+      />
+
+      <EvolutionSheet
+        open={logOpen}
+        onOpenChange={setLogOpen}
+        appointment={selected}
+        onSuccess={fetchAppointments}
+      />
+    </div>
+  );
+};
+
+// ── DAY VIEW (timeline) ─────────────────────────────────────
+const DayView = ({ date, appointments, slots, onSelect, onOpenAvailability }: any) => {
+  const dayStr = format(date, "yyyy-MM-dd");
+  const dayAppts = appointments.filter((a: any) => a.appointment_date === dayStr);
+  const daySlots = slots.filter((s: any) => s.slot_date === dayStr);
+  const hours = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
+
+  const timeBlockStyle = (startTime: string, durationMin: number) => {
+    const [h, m] = startTime.split(":").map(Number);
+    const top = (h - START_HOUR) * HOUR_HEIGHT + (m / 60) * HOUR_HEIGHT;
+    const height = (durationMin / 60) * HOUR_HEIGHT;
+    return { top, height: Math.max(height, 36) };
+  };
+
+  if (dayAppts.length === 0 && daySlots.length === 0) {
+    return (
+      <Card className="border-dashed border-border bg-card/50">
+        <CardContent className="py-12 text-center text-muted-foreground">
+          <Clock className="mx-auto mb-2 h-8 w-8 opacity-40" />
+          <p className="text-sm">Sem agendamentos para este dia</p>
+          <Button variant="outline" size="sm" className="mt-4 rounded-sm gap-2" onClick={onOpenAvailability}>
+            <CalendarClock className="h-4 w-4" /> Criar slots
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="relative rounded-2xl border border-border/60 bg-card/40 p-3">
+      <div className="relative" style={{ height: hours.length * HOUR_HEIGHT }}>
+        {/* Hour grid */}
+        {hours.map((h, i) => (
+          <div
+            key={h}
+            className="absolute left-0 right-0 flex items-start gap-3 border-t border-border/40"
+            style={{ top: i * HOUR_HEIGHT, height: HOUR_HEIGHT }}
+          >
+            <span className="-mt-2 w-10 shrink-0 text-right text-[10px] text-muted-foreground tabular-nums">
+              {String(h).padStart(2, "0")}:00
+            </span>
+          </div>
+        ))}
+
+        <div className="absolute inset-y-0 left-12 right-1">
+          {daySlots.map((slot: any) => {
+            const [startHour, startMin] = slot.start_time.split(":").map(Number);
+            const [endHour, endMin] = slot.end_time.split(":").map(Number);
+            const durationMin = endHour * 60 + endMin - (startHour * 60 + startMin);
+            const s = timeBlockStyle(slot.start_time, Math.max(durationMin, 30));
+
+            return (
+              <div
+                key={slot.id}
+                className={cn(
+                  "absolute left-0 right-0 rounded-sm border border-dashed px-3 py-2 text-left",
+                  slotBg[slot.status] || slotBg.aberto
+                )}
+                style={{ top: s.top, height: s.height }}
+              >
+                <div className="flex items-center justify-between gap-2 text-[11px] font-mono-data">
+                  <span className="font-semibold tabular-nums">{slot.start_time?.slice(0, 5)} - {slot.end_time?.slice(0, 5)}</span>
+                  <span className="text-[9px] font-semibold uppercase tracking-wider">{slot.status}</span>
+                </div>
+                <p className="truncate text-xs">{slot.reason || (slot.status === "aberto" ? "Slot disponível" : slot.status === "reservado" ? "Horário reservado" : "Horário bloqueado")}</p>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="absolute inset-y-0 left-12 right-1">
+          {dayAppts.map((a: any) => {
+            const s = timeBlockStyle(a.appointment_time, a.duration_min || 30);
+            const isPkg = !!(a.package_id || a.package_session_index);
+            return (
+              <button
+                key={a.id}
+                onClick={() => onSelect(a)}
+                className={cn(
+                  "absolute left-0 right-0 z-10 overflow-hidden rounded-sm border-l-[3px] px-3 py-2 text-left transition-colors hover:bg-secondary",
+                  statusBg[a.status]
+                )}
+                style={{ top: s.top, height: s.height }}
+              >
+                <div className="flex items-center justify-between text-[11px] font-mono-data">
+                  <span className="font-semibold tabular-nums">{a.appointment_time?.slice(0, 5)}</span>
+                  <span className="font-semibold tabular-nums">R$ {Number(a.price).toFixed(0)}</span>
+                </div>
+                <p className="truncate text-sm font-medium">{a.client_name}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-[11px] text-muted-foreground">{a.service}</p>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-sm border px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider",
+                      isPkg
+                        ? "border-foreground/70 bg-foreground text-background"
+                        : "border-border bg-background text-muted-foreground"
+                    )}
+                  >
+                    {isPkg ? `Sessao ${a.package_session_index ?? "-"}${a.package_total ? ` de ${a.package_total}` : ""}` : "Avulso"}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── WEEK VIEW ────────────────────────────────────────────────
+const WeekView = ({ startDate, appointments, slots, onSelect }: any) => {
+  const days = eachDayOfInterval({ start: startDate, end: addDays(startDate, 6) });
+
+  return (
+    <div className="space-y-2">
+      {days.map((d) => {
+        const dayStr = format(d, "yyyy-MM-dd");
+        const appointmentList = appointments.filter((a: any) => a.appointment_date === dayStr);
+        const slotList = slots.filter((s: any) => s.slot_date === dayStr);
+        return (
+          <Card key={dayStr} className={cn("border-border/60", isToday(d) && "border-primary/40")}>
+            <CardContent className="p-3">
+              <div className="mb-2 flex items-baseline justify-between">
+                <div className="flex items-baseline gap-2">
+                  <span className={cn("text-xs uppercase tracking-wider", isToday(d) ? "text-primary font-semibold" : "text-muted-foreground")}>
+                    {format(d, "EEE", { locale: ptBR })}
+                  </span>
+                  <span className={cn("text-lg font-bold", isToday(d) && "text-primary")}>
+                    {format(d, "dd")}
+                  </span>
+                </div>
+                <span className="text-[10px] text-muted-foreground">{appointmentList.length} ag. · {slotList.length} slots</span>
+              </div>
+              {appointmentList.length === 0 && slotList.length === 0 ? (
+                <p className="py-2 text-xs text-muted-foreground/60">Sem agendamentos ou slots</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {slotList.map((slot: any) => (
+                    <div
+                      key={slot.id}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-sm border border-dashed px-2 py-1.5 text-left text-xs",
+                        slotBg[slot.status] || slotBg.aberto
+                      )}
+                    >
+                      <span className="font-semibold tabular-nums">{slot.start_time?.slice(0, 5)}</span>
+                      <span className="flex-1 truncate">{slot.reason || "Slot"}</span>
+                      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider">{slot.status}</span>
+                    </div>
+                  ))}
+                  {appointmentList.map((a: any) => {
+                    const isPkg = !!(a.package_id || a.package_session_index);
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => onSelect(a)}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-sm border-l-4 bg-secondary/40 px-2 py-1.5 text-left text-xs transition-colors hover:bg-secondary/70",
+                          statusBg[a.status]
+                        )}
+                      >
+                        <span className="font-semibold tabular-nums">{a.appointment_time?.slice(0, 5)}</span>
+                        <span className="flex-1 truncate">{a.client_name}</span>
+                        <span className="truncate text-muted-foreground">{a.service}</span>
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-sm border px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider",
+                            isPkg ? "border-foreground bg-foreground text-background" : "border-border bg-background text-muted-foreground"
+                          )}
+                        >
+                          {isPkg ? `Sessao ${a.package_session_index ?? "-"}${a.package_total ? `/${a.package_total}` : ""}` : "Avulso"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+};
+
+// ── MONTH VIEW ───────────────────────────────────────────────
+const MonthView = ({ anchor, appointments, slots, onSelectDay }: any) => {
+  const monthStart = startOfMonth(anchor);
+  const monthEnd = endOfMonth(anchor);
+  const weeks = eachWeekOfInterval({ start: monthStart, end: monthEnd }, { weekStartsOn: 1 });
+
+  const countByDay = appointments.reduce((acc: Record<string, number>, a: any) => {
+    acc[a.appointment_date] = (acc[a.appointment_date] || 0) + 1;
+    return acc;
+  }, {});
+
+  slots.forEach((slot: any) => {
+    countByDay[slot.slot_date] = (countByDay[slot.slot_date] || 0) + 1;
+  });
+
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card/40 p-3">
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {["S", "T", "Q", "Q", "S", "S", "D"].map((d, i) => (
+          <div key={i} className="text-center text-[10px] uppercase text-muted-foreground">{d}</div>
+        ))}
+      </div>
+      {weeks.map((w) => {
+        const days = eachDayOfInterval({ start: w, end: addDays(w, 6) });
+        return (
+          <div key={w.toString()} className="grid grid-cols-7 gap-1 mb-1">
+            {days.map((d) => {
+              const inMonth = d.getMonth() === anchor.getMonth();
+              const count = countByDay[format(d, "yyyy-MM-dd")] || 0;
+              return (
+                <button
+                  key={d.toString()}
+                  onClick={() => onSelectDay(d)}
+                  className={cn(
+                    "aspect-square rounded-lg border border-transparent p-1 text-xs transition-all hover:border-primary/40 hover:bg-secondary/40",
+                    !inMonth && "opacity-30",
+                    isToday(d) && "border-primary/60 bg-primary/10"
+                  )}
+                >
+                  <div className="flex h-full flex-col items-center justify-between">
+                    <span className={cn("font-medium", isToday(d) && "text-primary")}>{format(d, "d")}</span>
+                    {count > 0 && (
+                      <span className="rounded-full bg-gradient-brand px-1.5 text-[9px] font-bold text-primary-foreground">
+                        {count}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+export default Index;
