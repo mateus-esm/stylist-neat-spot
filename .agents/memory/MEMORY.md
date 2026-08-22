@@ -1,0 +1,1 @@
+- [Clinic authorization boundaries](clinic-authorization-boundaries.md) — bookings and media use controlled server flows; do not re-open generic data mutations for convenience.

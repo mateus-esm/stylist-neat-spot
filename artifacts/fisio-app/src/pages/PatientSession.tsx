@@ -49,7 +49,7 @@ const PatientSession = () => {
 
   const startSession = async () => {
     const { error } = await db.from("appointments").update({ status: "em_andamento" }).eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Sessão iniciada");
     load();
   };
@@ -60,21 +60,21 @@ const PatientSession = () => {
       observations: obs || null,
       patient_notes: diary || null,
     }).eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Registro salvo");
   };
 
   const toggleExercise = async (ex: any) => {
     const completed_at = ex.completed_at ? null : new Date().toISOString();
     const { error } = await db.from("session_exercises").update({ completed_at }).eq("id", ex.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, completed_at } : r)));
   };
 
   const setPerformance = async (ex: any, performance: string) => {
     const next = ex.performance === performance ? null : performance;
     const { error } = await db.from("session_exercises").update({ performance: next }).eq("id", ex.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, performance: next } : r)));
   };
 

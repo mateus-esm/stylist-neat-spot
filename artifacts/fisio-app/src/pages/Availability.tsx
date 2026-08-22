@@ -50,7 +50,7 @@ const Availability = () => {
       status,
       reason: reason || null,
     });
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(status === "bloqueado" ? "Horario bloqueado" : "Slot adicionado");
     setReason("");
     fetchSlots();
@@ -59,7 +59,7 @@ const Availability = () => {
   const removeSlot = async (id: string) => {
     if (!confirm("Remover este horario?")) return;
     const { error } = await db.from("availability_slots").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     fetchSlots();
   };
 

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
+import { createClinicBooking } from "@workspace/api-client-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,22 +46,18 @@ const PatientPortal = () => {
 
   const requestSlot = async (slot: any) => {
     if (!client) return;
-    // Create appointment as 'solicitado' and mark slot reserved
-    const { data: appt, error: e1 } = await db.from("appointments").insert({
-      user_id: slot.user_id,
-      client_id: client.id,
-      client_name: client.name,
-      appointment_date: slot.slot_date,
-      appointment_time: slot.start_time,
-      service: "Sessao solicitada",
-      price: 0,
-      status: "solicitado",
-      duration_min: 50,
-    }).select().single();
-    if (e1) return toast.error(e1.message);
-
-    const { error: e2 } = await db.from("availability_slots").update({ status: "reservado", appointment_id: appt.id }).eq("id", slot.id);
-    if (e2) return toast.error(e2.message);
+    // Atomic booking: creates the "solicitado" appointment and reserves the
+    // slot in a single server transaction (race-safe).
+    try {
+      await createClinicBooking({ slotId: slot.id });
+    } catch (error: any) {
+      const message =
+        error?.status === 409
+          ? "Este horario acabou de ser reservado. Escolha outro."
+          : error?.message || "Nao foi possivel solicitar o horario.";
+      toast.error(message);
+      return;
+    }
 
     toast.success("Horario solicitado. Aguarde confirmacao.");
     setRequestOpen(false);

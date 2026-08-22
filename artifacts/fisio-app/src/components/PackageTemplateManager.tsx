@@ -25,7 +25,7 @@ const PackageTemplateManager = () => {
   useEffect(() => { load(); }, []);
 
   const add = async () => {
-    if (!user || !name) return toast.error("Informe o nome");
+    if (!user || !name) { toast.error("Informe o nome"); return; }
     const { error } = await db.from("package_templates").insert({
       user_id: user.id,
       name,
@@ -33,7 +33,7 @@ const PackageTemplateManager = () => {
       default_price: Number(price),
       default_service: service || null,
     });
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     setName(""); setSessions("10"); setPrice("0"); setService("");
     load();
   };

@@ -61,11 +61,12 @@ const Patients = () => {
     const nextStats: Record<string, { total: number; last: string | null }> = {};
     appointments?.forEach((appointment: any) => {
       if (!appointment.client_id) return;
-      if (!nextStats[appointment.client_id]) nextStats[appointment.client_id] = { total: 0, last: null };
-      nextStats[appointment.client_id].total += 1;
-      if (!nextStats[appointment.client_id].last || appointment.appointment_date > nextStats[appointment.client_id].last) {
-        nextStats[appointment.client_id].last = appointment.appointment_date;
+      const entry = nextStats[appointment.client_id] ?? { total: 0, last: null };
+      entry.total += 1;
+      if (!entry.last || appointment.appointment_date > entry.last) {
+        entry.last = appointment.appointment_date;
       }
+      nextStats[appointment.client_id] = entry;
     });
     setStats(nextStats);
   };
@@ -110,7 +111,7 @@ const Patients = () => {
     setSaving(true);
     const { error } = await db.from("clients").update(anamnesis).eq("id", selectedPatient.id);
     setSaving(false);
-    if (error) return toast.error("Erro ao salvar anamnese", { description: error.message });
+    if (error) { toast.error("Erro ao salvar anamnese", { description: error.message }); return; }
     toast.success("Anamnese atualizada");
     const updated = { ...selectedPatient, ...anamnesis };
     setSelectedPatient(updated);
@@ -133,7 +134,7 @@ const Patients = () => {
     });
     setSaving(false);
 
-    if (error) return toast.error("Erro ao registrar pacote", { description: error.message });
+    if (error) { toast.error("Erro ao registrar pacote", { description: error.message }); return; }
     toast.success("Pacote registrado");
     setPackageName("Reabilitacao pos-operatoria - 12 sessoes");
     setPackageSessions("12");
@@ -239,7 +240,7 @@ const Patients = () => {
                           const email = prompt("Email do paciente para enviar o convite:");
                           if (!email) return;
                           const { data, error } = await supabase.functions.invoke("invite-patient", { body: { client_id: selectedPatient.id, email } });
-                          if (error || (data as any)?.error) return toast.error((data as any)?.error ?? error?.message ?? "Falha");
+                          if (error || (data as any)?.error) { toast.error((data as any)?.error ?? error?.message ?? "Falha"); return; }
                           toast.success("Convite enviado");
                           await fetchProfile({ ...selectedPatient, auth_user_id: (data as any).user_id });
                         }}

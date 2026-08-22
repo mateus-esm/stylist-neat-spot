@@ -40,12 +40,12 @@ const Planning = () => {
   useEffect(() => { load(); }, []);
 
   const save = async () => {
-    if (!user || !clientId || !title) return toast.error("Paciente e título são obrigatórios");
+    if (!user || !clientId || !title) { toast.error("Paciente e título são obrigatórios"); return; }
     const { error } = await db.from("session_plans").insert({
       user_id: user.id, client_id: clientId, week_start: weekStart, title, content,
       exercises, scheduling, tips,
     });
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Plano salvo");
     setTitle(""); setContent(""); setExercises(""); setScheduling(""); setTips("");
     load();
@@ -59,7 +59,7 @@ const Planning = () => {
   const notify = async (plan: any) => {
     const c = clients.find((x) => x.id === plan.client_id);
     const phone = c?.phone?.replace(/\D/g, "");
-    if (!phone) return toast.error("Paciente sem telefone");
+    if (!phone) { toast.error("Paciente sem telefone"); return; }
     const full = phone.startsWith("55") ? phone : `55${phone}`;
     const wk = format(new Date(plan.week_start + "T12:00:00"), "dd/MM");
     const parts = [

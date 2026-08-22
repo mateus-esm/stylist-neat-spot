@@ -1,31 +1,33 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useGetClinicSession } from "@workspace/api-client-react";
 
 export type AppRole = "admin" | "patient";
 
 export const useRole = () => {
   const { user, loading: authLoading } = useAuth();
   const [role, setRole] = useState<AppRole | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  // Skip query if no user is signed in to avoid 401s
+  const { data: session, isLoading: sessionLoading } = useGetClinicSession({
+    query: {
+      enabled: !!user && !authLoading,
+      queryKey: ["/api/clinic/me"],
+    },
+  });
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
+    if (session) {
+      setRole(session.role as AppRole);
+    } else if (!user && !authLoading) {
       setRole(null);
-      setLoading(false);
-      return;
     }
-    (supabase as any)
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }: any) => {
-        setRole((data?.role as AppRole) ?? null);
-        setLoading(false);
-      });
-  }, [user, authLoading]);
+  }, [session, user, authLoading]);
 
-  return { role, loading: authLoading || loading, isAdmin: role === "admin", isPatient: role === "patient" };
+  return {
+    role,
+    loading: authLoading || sessionLoading,
+    isAdmin: role === "admin",
+    isPatient: role === "patient",
+  };
 };

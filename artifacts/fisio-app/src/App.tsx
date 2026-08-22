@@ -21,7 +21,15 @@ import PatientSession from "./pages/PatientSession";
 import AcceptInvite from "./pages/AcceptInvite";
 import BottomNav from "./components/BottomNav";
 
+import { ClerkProvider } from "@clerk/react";
+import { publishableKeyFromHost } from "@clerk/react/internal";
+
 const queryClient = new QueryClient();
+const clerkPubKey = publishableKeyFromHost(
+  window.location.hostname,
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+);
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
 const ProtectedRoute = ({ children, allow }: { children: React.ReactNode; allow?: "admin" | "patient" }) => {
   const { user, loading } = useAuth();
@@ -47,8 +55,9 @@ const ProtectedRoute = ({ children, allow }: { children: React.ReactNode; allow?
 const AuthRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   const { role, loading: roleLoading } = useRole();
-  if (loading || (user && roleLoading)) return null;
+  if (loading || (user && roleLoading)) return <div className="flex min-h-screen items-center justify-center">Carregando...</div>;
   if (user && role) return <Navigate to={role === "patient" ? "/meu-app" : "/"} replace />;
+  if (user && !role) return <Navigate to="/" replace />; // Let ProtectedRoute handle the no-role screen
   return <>{children}</>;
 };
 
@@ -60,7 +69,13 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => (
 );
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <ClerkProvider
+    publishableKey={clerkPubKey}
+    proxyUrl={clerkProxyUrl}
+    signInUrl="/sign-in"
+    signUpUrl="/sign-up"
+  >
+    <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <TooltipProvider>
         <Toaster />
@@ -68,7 +83,9 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <Routes>
-              <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+              <Route path="/auth" element={<Navigate to="/sign-in" replace />} />
+              <Route path="/sign-in/*" element={<AuthRoute><Auth /></AuthRoute>} />
+              <Route path="/sign-up/*" element={<AuthRoute><Auth /></AuthRoute>} />
               <Route path="/aceitar-convite" element={<AcceptInvite />} />
 
               {/* Admin */}
@@ -93,6 +110,7 @@ const App = () => (
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
+  </ClerkProvider>
 );
 
 export default App;

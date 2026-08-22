@@ -28,7 +28,7 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
 
   useEffect(() => {
     if (open && appointment?.client_id) {
-      supabase.from("clients").select("*").eq("id", appointment.client_id).maybeSingle().then(({ data }) => setClient(data));
+      supabase.from("clients").select("*").eq("id", appointment.client_id).maybeSingle().then(({ data }: { data: any }) => setClient(data));
     } else {
       setClient(null);
     }
@@ -39,10 +39,10 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
   const updateStatus = async (status: string) => {
     if (status === "atendido") {
       const { error } = await completeAppointment(appointment.id);
-      if (error) return toast.error(error);
+      if (error) { toast.error(error); return; }
     } else {
       const { error } = await supabase.from("appointments").update({ status }).eq("id", appointment.id);
-      if (error) return toast.error(error.message);
+      if (error) { toast.error(error.message); return; }
     }
     toast.success("Status atualizado");
     onRefresh();
@@ -52,7 +52,7 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
   const remove = async () => {
     if (!confirm("Excluir este agendamento?")) return;
     const { error } = await supabase.from("appointments").delete().eq("id", appointment.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Excluído");
     onRefresh();
     onOpenChange(false);
@@ -60,7 +60,7 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
 
   const notify = () => {
     const phone = client?.phone?.replace(/\D/g, "");
-    if (!phone) return toast.error("Cliente sem telefone");
+    if (!phone) { toast.error("Cliente sem telefone"); return; }
     const fullPhone = phone.startsWith("55") ? phone : `55${phone}`;
     const msg = encodeURIComponent(
       `Olá ${appointment.client_name}! Confirmando sua sessão às ${appointment.appointment_time?.slice(0, 5)} no dia ${format(new Date(appointment.appointment_date + "T12:00:00"), "dd/MM")}. — One Fisioterapia Esportiva`

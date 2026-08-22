@@ -53,7 +53,7 @@ const PrescriptionTab = ({ appointmentId }: Props) => {
   }, [appointmentId]);
 
   const add = async () => {
-    if (!form.name.trim()) return toast.error("Nome obrigatório");
+    if (!form.name.trim()) { toast.error("Nome obrigatório"); return; }
     setSaving(true);
     const { error } = await supabase.from("session_exercises").insert({
       appointment_id: appointmentId,
@@ -65,28 +65,28 @@ const PrescriptionTab = ({ appointmentId }: Props) => {
       order_index: exercises.length,
     });
     setSaving(false);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     setForm(emptyForm);
     fetchEx();
   };
 
   const remove = async (id: string) => {
     const { error } = await supabase.from("session_exercises").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     fetchEx();
   };
 
   const toggleDone = async (ex: Exercise) => {
     const completed_at = ex.completed_at ? null : new Date().toISOString();
     const { error } = await supabase.from("session_exercises").update({ completed_at }).eq("id", ex.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, completed_at } : r)));
   };
 
   const setPerf = async (ex: Exercise, performance: string) => {
     const next = ex.performance === performance ? null : performance;
     const { error } = await supabase.from("session_exercises").update({ performance: next }).eq("id", ex.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, performance: next } : r)));
   };
 

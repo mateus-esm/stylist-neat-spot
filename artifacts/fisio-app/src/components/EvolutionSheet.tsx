@@ -12,6 +12,7 @@ import { CheckCircle2, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { completeAppointment } from "@/lib/appointmentCompletion";
+import { finalizeAppointmentMedia } from "@workspace/api-client-react";
 
 const db = supabase as any;
 
@@ -74,16 +75,28 @@ const EvolutionSheet = ({ open, onOpenChange, appointment, onSuccess }: Props) =
 
     const ext = mediaFile.name.split(".").pop();
     const path = `${user.id}/${appointment.id}-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage
+    const { data: uploadData, error } = await supabase.storage
       .from("service-photos")
       .upload(path, mediaFile, { upsert: true, contentType: mediaFile.type });
 
-    if (error) {
-      toast.error("Midia nao enviada", { description: error.message });
+    if (error || !uploadData) {
+      toast.error("Midia nao enviada", { description: error?.message || "Erro" });
       return appointment?.media_url || appointment?.photo_url || null;
     }
 
-    const { data } = supabase.storage.from("service-photos").getPublicUrl(path);
+    try {
+      await finalizeAppointmentMedia(appointment.id, {
+        objectPath: uploadData.path,
+        mediaType: mediaFile.type.startsWith("video/") ? "video" : "image",
+      });
+    } catch (finalizeError) {
+      toast.error("Mídia não vinculada à sessão", {
+        description: "O arquivo foi enviado, mas não pôde ser associado com segurança.",
+      });
+      return appointment?.media_url || appointment?.photo_url || null;
+    }
+
+    const { data } = supabase.storage.from("service-photos").getPublicUrl(uploadData.path);
     return data.publicUrl;
   };
 

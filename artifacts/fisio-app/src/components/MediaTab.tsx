@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { finalizeAppointmentMedia } from "@workspace/api-client-react";
 
 const db = supabase as any;
 const BUCKET = "session-media";
@@ -14,6 +15,7 @@ interface Props {
   appointmentId: string;
 }
 
+// Server returns snake_case (via rowToSnake) for both list GET and finalize POST.
 interface MediaItem {
   id: string;
   storage_path: string;
@@ -39,7 +41,9 @@ const MediaTab = ({ appointmentId }: Props) => {
 
     const withUrls: MediaItem[] = [];
     for (const m of (data || []) as MediaItem[]) {
-      const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(m.storage_path, 3600);
+      const { data: signed } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrl(m.storage_path, 3600);
       withUrls.push({ ...m, signedUrl: signed?.signedUrl });
     }
     setItems(withUrls);
@@ -55,28 +59,51 @@ const MediaTab = ({ appointmentId }: Props) => {
     setUploading(true);
     const ext = file.name.split(".").pop();
     const path = `${appointmentId}/${crypto.randomUUID()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
-      upsert: false,
-      contentType: file.type,
-    });
-    if (upErr) {
+    const { data: uploadData, error: upErr } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, file, {
+        upsert: false,
+        contentType: file.type,
+      });
+    if (upErr || !uploadData) {
       setUploading(false);
-      return toast.error(upErr.message);
+      toast.error(upErr?.message || "Erro no upload");
+      return;
     }
     const mediaType = file.type.startsWith("video") ? "video" : "image";
-    const { error } = await db.from("session_media").insert({
-      appointment_id: appointmentId,
-      storage_path: path,
-      media_type: mediaType,
-      caption: caption || null,
-      uploaded_by: user.id,
-    });
+    let record: MediaItem;
+    try {
+      // finalizeAppointmentMedia returns ClinicRecord (generic object);
+      // the server serializes it through rowToSnake so fields are snake_case.
+      record = (await finalizeAppointmentMedia(appointmentId, {
+        objectPath: uploadData.path,
+        mediaType,
+        caption: caption || undefined,
+      })) as unknown as MediaItem;
+    } catch (finalizeError: any) {
+      setUploading(false);
+      toast.error("Mídia não vinculada à sessão", {
+        description:
+          finalizeError?.message ||
+          "O arquivo foi enviado, mas não pôde ser associado com segurança.",
+      });
+      return;
+    }
+
     setUploading(false);
-    if (error) return toast.error(error.message);
     setCaption("");
     e.target.value = "";
     toast.success("Mídia enviada");
-    load();
+
+    // Use the returned durable record; build its signed URL and prepend.
+    if (record?.storage_path) {
+      const { data: signed } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrl(record.storage_path, 3600);
+      setItems((prev) => [{ ...record, signedUrl: signed?.signedUrl }, ...prev]);
+    } else {
+      load();
+    }
   };
 
   const remove = async (item: MediaItem) => {

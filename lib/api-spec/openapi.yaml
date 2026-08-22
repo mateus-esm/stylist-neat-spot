@@ -24,7 +24,194 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /clinic/me:
+    get:
+      operationId: getClinicSession
+      tags: [clinic]
+      summary: Current clinic user and role
+      responses:
+        "200":
+          description: Signed-in user context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicSession"
+        "401":
+          description: Unauthorized
+  /clinic/data/{table}:
+    get:
+      operationId: listClinicRecords
+      tags: [clinic]
+      summary: List records from an authorized clinic resource
+      parameters:
+        - $ref: "#/components/parameters/ClinicTable"
+        - name: filters
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: order
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicRecordList"
+    post:
+      operationId: createClinicRecord
+      tags: [clinic]
+      summary: Create an authorized clinic record
+      parameters:
+        - $ref: "#/components/parameters/ClinicTable"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClinicRecordInput"
+      responses:
+        "201":
+          description: Created record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicRecord"
+  /clinic/data/{table}/{id}:
+    patch:
+      operationId: updateClinicRecord
+      tags: [clinic]
+      summary: Update an authorized clinic record
+      parameters:
+        - $ref: "#/components/parameters/ClinicTable"
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClinicRecordInput"
+      responses:
+        "200":
+          description: Updated record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicRecord"
+    delete:
+      operationId: deleteClinicRecord
+      tags: [clinic]
+      summary: Delete an authorized clinic record
+      parameters:
+        - $ref: "#/components/parameters/ClinicTable"
+        - $ref: "#/components/parameters/RecordId"
+      responses:
+        "204":
+          description: Deleted
+  /clinic/invitations:
+    post:
+      operationId: inviteClinicPatient
+      tags: [clinic]
+      summary: Invite a patient to their clinic portal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatientInviteInput"
+      responses:
+        "201":
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientInvite"
+  /clinic/bookings:
+    post:
+      operationId: createClinicBooking
+      tags: [clinic]
+      summary: Patient books an open availability slot (atomic)
+      description: >
+        Atomically creates a "solicitado" appointment for the authenticated
+        patient's linked client and reserves the referenced open slot in one
+        transaction. If the slot is no longer available, no appointment is
+        created and a 409 is returned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClinicBookingInput"
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicBooking"
+        "409":
+          description: Slot no longer available
+  /clinic/appointments/{id}/media:
+    post:
+      operationId: finalizeAppointmentMedia
+      tags: [clinic]
+      summary: Finalize an uploaded object into appointment media
+      description: >
+        Consumes a DB-backed pending upload (created by
+        POST /storage/uploads/request-url) and records it as session media for
+        the target appointment, so subsequent GET /storage/objects requests are
+        durably authorised via the session_media chain. The pending upload must
+        belong to the caller, be unexpired and unconsumed, and the caller must
+        be authorised for the appointment (owning admin, or the linked patient
+        for their own appointment). uploaded_by is forced to the caller.
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppointmentMediaInput"
+      responses:
+        "200":
+          description: Existing media record (idempotent)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicRecord"
+        "201":
+          description: Media record created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicRecord"
+        "403":
+          description: Caller not authorised for the appointment or pending upload
+        "404":
+          description: Appointment, object, or pending upload not found
+        "409":
+          description: Pending upload already finalized
+        "410":
+          description: Pending upload expired
 components:
+  parameters:
+    ClinicTable:
+      name: table
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [appointments, availability_slots, clients, package_templates, patient_packages, services, session_exercises, session_media, session_plans, user_roles]
+    RecordId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +220,61 @@ components:
           type: string
       required:
         - status
+    ClinicSession:
+      type: object
+      required: [userId, role]
+      properties:
+        userId:
+          type: string
+        role:
+          type: ["string", "null"]
+          enum: [admin, patient, null]
+    ClinicRecord:
+      type: object
+      additionalProperties: true
+    ClinicRecordList:
+      type: array
+      items:
+        $ref: "#/components/schemas/ClinicRecord"
+    ClinicRecordInput:
+      type: object
+      additionalProperties: true
+    PatientInviteInput:
+      type: object
+      required: [clientId, email]
+      properties:
+        clientId:
+          type: string
+        email:
+          type: string
+    PatientInvite:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+    ClinicBookingInput:
+      type: object
+      required: [slotId]
+      properties:
+        slotId:
+          type: string
+    ClinicBooking:
+      type: object
+      required: [appointment, slot]
+      properties:
+        appointment:
+          $ref: "#/components/schemas/ClinicRecord"
+        slot:
+          $ref: "#/components/schemas/ClinicRecord"
+    AppointmentMediaInput:
+      type: object
+      required: [objectPath]
+      properties:
+        objectPath:
+          type: string
+        mediaType:
+          type: string
+        caption:
+          type: string
 

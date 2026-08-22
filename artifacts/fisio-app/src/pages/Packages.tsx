@@ -122,7 +122,7 @@ const Packages = () => {
 
   const create = async () => {
     if (!user) return;
-    if (!form.client_id || !form.name) return toast.error("Cliente e nome são obrigatórios");
+    if (!form.client_id || !form.name) { toast.error("Cliente e nome são obrigatórios"); return; }
     const { error } = await db.from("patient_packages").insert({
       user_id: user.id,
       client_id: form.client_id,
@@ -135,7 +135,7 @@ const Packages = () => {
       started_at: new Date().toISOString(),
       status: "ativo",
     });
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Pacote criado");
     setOpen(false);
     setForm({ client_id: "", template_id: "custom", name: "", service: "", total_sessions: "10", price: "0", payment_status: "pendente" });
@@ -146,7 +146,7 @@ const Packages = () => {
     const { error } = await db.from("patient_packages")
       .update({ payment_status: "pago", paid_at: new Date().toISOString() })
       .eq("id", p.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     load();
   };
 
@@ -156,7 +156,7 @@ const Packages = () => {
       .update({ status: "encerrado", finished_at: new Date().toISOString() })
       .eq("id", closeTarget.id);
     setCloseTarget(null);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Pacote encerrado");
     load();
   };

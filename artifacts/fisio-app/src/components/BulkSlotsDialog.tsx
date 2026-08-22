@@ -68,14 +68,13 @@ const BulkSlotsDialog = ({ open, onOpenChange, onCreated }: Props) => {
 
   const submitRecurring = async () => {
     if (!user) return;
-    if (!days.length) return toast.error("Selecione ao menos um dia");
+    if (!days.length) { toast.error("Selecione ao menos um dia"); return; }
     const [sh, sm] = startHour.split(":").map(Number);
     const [eh, em] = endHour.split(":").map(Number);
     const dur = Number(duration);
     const totalMinStart = sh * 60 + sm;
     const totalMinEnd = eh * 60 + em;
-    if (dur <= 0 || totalMinEnd <= totalMinStart) return toast.error("Faixa horária inválida");
-
+    if (dur <= 0 || totalMinEnd <= totalMinStart) { toast.error("Faixa horária inválida"); return; }
     const rows: any[] = [];
     const base = new Date(recurStart + "T12:00:00");
     const total = Number(weeks) * 7;
@@ -90,9 +89,9 @@ const BulkSlotsDialog = ({ open, onOpenChange, onCreated }: Props) => {
         rows.push(buildSlot(dateStr, s, e));
       }
     }
-    if (!rows.length) return toast.error("Nenhum slot gerado");
+    if (!rows.length) { toast.error("Nenhum slot gerado"); return; }
     const { error } = await db.from("availability_slots").insert(rows);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(`${rows.length} horários criados`);
     onCreated();
     onOpenChange(false);
@@ -103,9 +102,9 @@ const BulkSlotsDialog = ({ open, onOpenChange, onCreated }: Props) => {
     const rows = entries
       .filter((e) => e.date && e.start && e.end)
       .map((e) => buildSlot(e.date, e.start, e.end));
-    if (!rows.length) return toast.error("Adicione ao menos um horário");
+    if (!rows.length) { toast.error("Adicione ao menos um horário"); return; }
     const { error } = await db.from("availability_slots").insert(rows);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(`${rows.length} horários criados`);
     onCreated();
     onOpenChange(false);

@@ -36,7 +36,7 @@ const Returns = () => {
       .order("appointment_date", { ascending: false });
 
     const lastByClient: Record<string, string> = {};
-    appts?.forEach((a) => {
+    appts?.forEach((a: any) => {
       if (a.client_id && !lastByClient[a.client_id]) lastByClient[a.client_id] = a.appointment_date;
     });
 

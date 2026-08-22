@@ -182,7 +182,7 @@ const Index = () => {
             anchor={anchorDate}
             appointments={appointments}
             slots={slots}
-            onSelectDay={(d) => { setAnchorDate(d); setView("day"); }}
+            onSelectDay={(d: Date) => { setAnchorDate(d); setView("day"); }}
           />
         )}
       </div>

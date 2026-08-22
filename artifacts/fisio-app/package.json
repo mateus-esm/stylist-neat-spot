@@ -76,8 +76,8 @@
     "zod": "catalog:"
   },
   "dependencies": {
-    "@lovable.dev/cloud-auth-js": "^1.1.2",
-    "@supabase/supabase-js": "^2.112.3",
+    "@clerk/react": "^6.14.5",
+    "@clerk/themes": "^2.4.57",
     "react-router-dom": "^7.18.2",
     "vitest": "^4.1.11"
   }

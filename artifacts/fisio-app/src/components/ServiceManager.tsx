@@ -33,7 +33,7 @@ const ServiceManager = () => {
 
   const add = async () => {
     if (!user) return;
-    if (!form.name.trim()) return toast.error("Nome obrigatório");
+    if (!form.name.trim()) { toast.error("Nome obrigatório"); return; }
     setSaving(true);
     const { error } = await db.from("services").insert({
       user_id: user.id,
@@ -42,21 +42,21 @@ const ServiceManager = () => {
       default_price: Number(form.default_price) || 0,
     });
     setSaving(false);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     setForm({ name: "", default_duration_min: "60", default_price: "0" });
     load();
   };
 
   const toggle = async (s: Service) => {
     const { error } = await db.from("services").update({ active: !s.active }).eq("id", s.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     load();
   };
 
   const remove = async (id: string) => {
     if (!confirm("Remover serviço?")) return;
     const { error } = await db.from("services").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     load();
   };
 
