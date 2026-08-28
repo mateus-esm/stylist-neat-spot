@@ -21,3 +21,8 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+CLINIC_INITIAL_ADMIN_EMAIL = "mateussmaia95@gmail.com"
