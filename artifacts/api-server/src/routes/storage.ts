@@ -29,6 +29,7 @@ import {
   clientsTable,
   userRolesTable,
   pendingUploadsTable,
+  clinicAssignmentsTable,
 } from "@workspace/db";
 import {
   ObjectNotFoundError,
@@ -41,6 +42,7 @@ import {
   canAccessObject,
   ObjectPermission,
 } from "../lib/objectAcl";
+import { getStoredRole } from "./../lib/clinicRole";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -125,6 +127,15 @@ async function canReadMedia(
   // Admin who owns the appointment
   if (appt.userId === userId) return true;
 
+  const [assigned] = await db.select({ id: clinicAssignmentsTable.id })
+    .from(clinicAssignmentsTable)
+    .where(and(
+      eq(clinicAssignmentsTable.clientId, appt.clientId ?? ""),
+      eq(clinicAssignmentsTable.physiotherapistUserId, userId),
+      eq(clinicAssignmentsTable.status, "active"),
+    )).limit(1);
+  if (assigned) return true;
+
   // Patient whose linked client matches
   if (appt.clientId) {
     const [client] = await db
@@ -165,6 +176,15 @@ async function canDeleteMedia(
     .limit(1);
   if (appt && appt.userId === userId) return true;
 
+  const [assigned] = await db.select({ id: clinicAssignmentsTable.id })
+    .from(clinicAssignmentsTable)
+    .where(and(
+      eq(clinicAssignmentsTable.clientId, (await db.select({ clientId: appointmentsTable.clientId }).from(appointmentsTable).where(eq(appointmentsTable.id, media.appointmentId)).limit(1))[0]?.clientId ?? ""),
+      eq(clinicAssignmentsTable.physiotherapistUserId, userId),
+      eq(clinicAssignmentsTable.status, "active"),
+    )).limit(1);
+  if (assigned) return true;
+
   return false;
 }
 
@@ -181,12 +201,8 @@ router.post(
     }
 
     // Only registered clinic users may upload
-    const [roleRow] = await db
-      .select()
-      .from(userRolesTable)
-      .where(eq(userRolesTable.userId, userId))
-      .limit(1);
-    if (!roleRow) {
+    const role = await getStoredRole(userId);
+    if (!role) {
       res.status(403).json({ error: "No clinic role assigned" });
       return;
     }

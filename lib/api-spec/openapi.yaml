@@ -38,6 +38,270 @@ paths:
                 $ref: "#/components/schemas/ClinicSession"
         "401":
           description: Unauthorized
+  /clinic/context:
+    get:
+      operationId: getClinicContext
+      tags: [clinic]
+      summary: Current clinic membership and role
+      responses:
+        "200":
+          description: Clinic context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicContext"
+  /clinic/members:
+    get:
+      operationId: listClinicMembers
+      tags: [clinic]
+      summary: List active and revoked clinic members
+      responses:
+        "200":
+          description: Clinic members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClinicMember"
+  /clinic/members/invitations:
+    post:
+      operationId: inviteClinicMember
+      tags: [clinic]
+      summary: Invite a clinic administrator or physiotherapist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClinicMemberInviteInput"
+      responses:
+        "201":
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicMemberInvitation"
+  /clinic/members/invitations/{token}/accept:
+    post:
+      operationId: acceptClinicMemberInvitation
+      tags: [clinic]
+      summary: Accept a clinic invitation
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Membership activated
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /clinic/members/{id}:
+    patch:
+      operationId: updateClinicMember
+      tags: [clinic]
+      summary: Change a member role or revoke access
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClinicMemberUpdate"
+      responses:
+        "200":
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicMember"
+  /clinic/assignments:
+    get:
+      operationId: listClinicAssignments
+      tags: [clinic]
+      summary: List patient responsibilities
+      responses:
+        "200":
+          description: Assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClinicAssignment"
+    post:
+      operationId: assignClinicPatient
+      tags: [clinic]
+      summary: Assign or unassign a physiotherapist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClinicAssignmentInput"
+      responses:
+        "200":
+          description: Assignment saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicAssignment"
+  /clinic/audit:
+    get:
+      operationId: listClinicAuditEvents
+      tags: [clinic]
+      summary: List clinic changes and clinical access events
+      responses:
+        "200":
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+  /clinic/portal:
+    get:
+      operationId: getPatientPortal
+      tags: [clinic]
+      summary: Authenticated patient portal data
+      responses:
+        "200":
+          description: Portal data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientPortal"
+  /clinic/portal/appointments/{id}:
+    get:
+      operationId: getPortalAppointment
+      tags: [clinic]
+      summary: Appointment detail for the patient or responsible professional
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      responses:
+        "200":
+          description: Appointment detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /clinic/portal/appointments/{id}/actions:
+    post:
+      operationId: performPortalAppointmentAction
+      tags: [clinic]
+      summary: Confirm, cancel, or request rescheduling
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortalAppointmentActionInput"
+      responses:
+        "200":
+          description: Idempotent action result
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /clinic/appointments/{id}/transfer:
+    post:
+      operationId: transferClinicAppointment
+      tags: [clinic]
+      summary: Transfer an appointment to an active physiotherapist
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [physiotherapistUserId]
+              properties:
+                physiotherapistUserId: { type: string }
+      responses:
+        "200":
+          description: Appointment transferred
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /clinic/whatsapp/consent:
+    get:
+      operationId: getWhatsappConsent
+      tags: [clinic]
+      summary: Read WhatsApp consent for a patient
+      responses:
+        "200":
+          description: Consent state
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    post:
+      operationId: updateWhatsappConsent
+      tags: [clinic]
+      summary: Opt in or out of clinic WhatsApp messages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatsappConsentInput"
+      responses:
+        "200":
+          description: Consent saved
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /clinic/whatsapp/outbox:
+    get:
+      operationId: listWhatsappOutbox
+      tags: [clinic]
+      summary: List WhatsApp delivery history
+      responses:
+        "200":
+          description: Outbox messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+    post:
+      operationId: enqueueWhatsappMessage
+      tags: [clinic]
+      summary: Queue a consented WhatsApp message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatsappOutboxInput"
+      responses:
+        "201":
+          description: Queued message
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /clinic/data/{table}:
     get:
       operationId: listClinicRecords
@@ -228,7 +492,71 @@ components:
           type: string
         role:
           type: ["string", "null"]
-          enum: [admin, patient, null]
+          enum: [owner, admin, physiotherapist, patient, null]
+    ClinicContext:
+      type: object
+      required: [clinicId, userId, role]
+      properties:
+        clinicId: { type: string }
+        userId: { type: string }
+        role: { type: string, enum: [owner, admin, physiotherapist, patient] }
+        clinic: { $ref: "#/components/schemas/Clinic" }
+    Clinic:
+      type: object
+      additionalProperties: true
+    ClinicMember:
+      type: object
+      additionalProperties: true
+    ClinicMemberInviteInput:
+      type: object
+      required: [email, role]
+      properties:
+        email: { type: string }
+        role: { type: string, enum: [admin, physiotherapist] }
+    ClinicMemberInvitation:
+      type: object
+      additionalProperties: true
+    ClinicMemberUpdate:
+      type: object
+      properties:
+        role: { type: string, enum: [admin, physiotherapist] }
+        status: { type: string, enum: [active, revoked] }
+    ClinicAssignment:
+      type: object
+      additionalProperties: true
+    ClinicAssignmentInput:
+      type: object
+      required: [clientId]
+      properties:
+        clientId: { type: string }
+        physiotherapistUserId: { type: ["string", "null"] }
+    PatientPortal:
+      type: object
+      additionalProperties: true
+    PortalAppointmentActionInput:
+      type: object
+      required: [action, confirmed, idempotencyKey]
+      properties:
+        action: { type: string, enum: [confirm_presence, request_reschedule, request_cancel] }
+        confirmed: { type: boolean, enum: [true] }
+        idempotencyKey: { type: string }
+        requestedSlotId: { type: string }
+    WhatsappConsentInput:
+      type: object
+      required: [optedIn]
+      properties:
+        clientId: { type: string }
+        phone: { type: string }
+        optedIn: { type: boolean }
+    WhatsappOutboxInput:
+      type: object
+      required: [clientId, eventType, idempotencyKey, fallbackText]
+      properties:
+        clientId: { type: string }
+        eventType: { type: string }
+        idempotencyKey: { type: string }
+        payload: { type: object, additionalProperties: true }
+        fallbackText: { type: string }
     ClinicRecord:
       type: object
       additionalProperties: true

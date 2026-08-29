@@ -20,9 +20,9 @@ const patientTabs = [
 const BottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isPatient, isAdmin } = useRole();
+  const { isPatient, isStaff } = useRole();
 
-  if (!isAdmin && !isPatient) return null;
+  if (!isStaff && !isPatient) return null;
   const tabs = isPatient ? patientTabs : adminTabs;
   if (tabs.length < 2) return null;
 

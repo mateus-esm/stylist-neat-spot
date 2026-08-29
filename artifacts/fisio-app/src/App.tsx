@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
@@ -31,11 +31,12 @@ const clerkPubKey = publishableKeyFromHost(
 );
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
-const ProtectedRoute = ({ children, allow }: { children: React.ReactNode; allow?: "admin" | "patient" }) => {
+const ProtectedRoute = ({ children, allow }: { children: React.ReactNode; allow?: "staff" | "patient" }) => {
   const { user, loading } = useAuth();
   const { role, loading: roleLoading } = useRole();
+  const location = useLocation();
   if (loading || roleLoading) return <div className="flex min-h-screen items-center justify-center">Carregando...</div>;
-  if (!user) return <Navigate to="/auth" replace />;
+  if (!user) return <Navigate to={`/sign-in?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   if (!role) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6 text-center">
@@ -48,7 +49,8 @@ const ProtectedRoute = ({ children, allow }: { children: React.ReactNode; allow?
       </div>
     );
   }
-  if (allow && role !== allow) return <Navigate to={role === "patient" ? "/meu-app" : "/"} replace />;
+  const allowed = !allow || (allow === "patient" ? role === "patient" : role !== "patient");
+  if (!allowed) return <Navigate to={role === "patient" ? "/meu-app" : "/"} replace />;
   return <>{children}</>;
 };
 
@@ -89,19 +91,20 @@ const App = () => (
               <Route path="/aceitar-convite" element={<AcceptInvite />} />
 
               {/* Admin */}
-              <Route path="/" element={<ProtectedRoute allow="admin"><AppLayout><Index /></AppLayout></ProtectedRoute>} />
-              <Route path="/pacientes" element={<ProtectedRoute allow="admin"><AppLayout><Patients /></AppLayout></ProtectedRoute>} />
+              <Route path="/" element={<ProtectedRoute allow="staff"><AppLayout><Index /></AppLayout></ProtectedRoute>} />
+              <Route path="/pacientes" element={<ProtectedRoute allow="staff"><AppLayout><Patients /></AppLayout></ProtectedRoute>} />
               <Route path="/clientes" element={<Navigate to="/pacientes" replace />} />
-              <Route path="/retornos" element={<ProtectedRoute allow="admin"><AppLayout><Returns /></AppLayout></ProtectedRoute>} />
-              <Route path="/financeiro" element={<ProtectedRoute allow="admin"><AppLayout><Financial /></AppLayout></ProtectedRoute>} />
-              <Route path="/disponibilidade" element={<ProtectedRoute allow="admin"><AppLayout><Availability /></AppLayout></ProtectedRoute>} />
-              <Route path="/pacotes" element={<ProtectedRoute allow="admin"><AppLayout><Packages /></AppLayout></ProtectedRoute>} />
-              <Route path="/planejamento" element={<ProtectedRoute allow="admin"><AppLayout><Planning /></AppLayout></ProtectedRoute>} />
-              <Route path="/configuracoes" element={<ProtectedRoute allow="admin"><AppLayout><Settings /></AppLayout></ProtectedRoute>} />
+              <Route path="/retornos" element={<ProtectedRoute allow="staff"><AppLayout><Returns /></AppLayout></ProtectedRoute>} />
+              <Route path="/financeiro" element={<ProtectedRoute allow="staff"><AppLayout><Financial /></AppLayout></ProtectedRoute>} />
+              <Route path="/disponibilidade" element={<ProtectedRoute allow="staff"><AppLayout><Availability /></AppLayout></ProtectedRoute>} />
+              <Route path="/pacotes" element={<ProtectedRoute allow="staff"><AppLayout><Packages /></AppLayout></ProtectedRoute>} />
+              <Route path="/planejamento" element={<ProtectedRoute allow="staff"><AppLayout><Planning /></AppLayout></ProtectedRoute>} />
+              <Route path="/configuracoes" element={<ProtectedRoute allow="staff"><AppLayout><Settings /></AppLayout></ProtectedRoute>} />
 
               {/* Patient */}
               <Route path="/meu-app" element={<ProtectedRoute allow="patient"><AppLayout><PatientPortal /></AppLayout></ProtectedRoute>} />
               <Route path="/meu-app/sessao/:id" element={<ProtectedRoute allow="patient"><AppLayout><PatientSession /></AppLayout></ProtectedRoute>} />
+              <Route path="/meu-app/agenda/:id" element={<ProtectedRoute allow="patient"><AppLayout><PatientPortal /></AppLayout></ProtectedRoute>} />
 
               <Route path="*" element={<NotFound />} />
             </Routes>

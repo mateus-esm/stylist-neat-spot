@@ -6,6 +6,8 @@ import { clientsTable } from "./clients";
 export const appointmentsTable = pgTable("appointments", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id").notNull(),
+  clinicId: uuid("clinic_id"),
+  assignedToUserId: text("assigned_to_user_id"),
   clientId: uuid("client_id").references(() => clientsTable.id, { onDelete: "cascade" }),
   clientName: text("client_name").notNull(),
   appointmentDate: date("appointment_date", { mode: "string" }).notNull(),

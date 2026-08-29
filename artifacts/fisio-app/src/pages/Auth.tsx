@@ -1,15 +1,17 @@
 import { SignIn, SignUp } from "@clerk/react";
 import { BrandLogo, SoloVenturesBadge } from "@/components/BrandLogo";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { dark } from "@clerk/themes";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
 const Auth = () => {
   const location = useLocation();
+  const [params] = useSearchParams();
   const { theme } = useTheme();
   
   const [isSignUp, setIsSignUp] = useState(false);
+  const redirect = params.get("redirect") || "/meu-app";
   
   useEffect(() => {
     setIsSignUp(location.pathname.startsWith("/sign-up"));
@@ -30,7 +32,7 @@ const Auth = () => {
               routing="path"
               path="/sign-up"
               signInUrl="/sign-in"
-              fallbackRedirectUrl="/meu-app"
+              fallbackRedirectUrl={redirect}
               appearance={{
                 theme: theme === "dark" ? dark : undefined,
                 elements: {
@@ -56,7 +58,7 @@ const Auth = () => {
               routing="path"
               path="/sign-in"
               signUpUrl="/sign-up"
-              fallbackRedirectUrl="/meu-app"
+                fallbackRedirectUrl={redirect}
               appearance={{
                 theme: theme === "dark" ? dark : undefined,
                 elements: {

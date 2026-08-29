@@ -33,6 +33,7 @@ import {
   sessionPlansTable,
   patientInvitesTable,
   pendingUploadsTable,
+  clinicAssignmentsTable,
 } from "@workspace/db";
 import {
   GetClinicSessionResponse,
@@ -50,6 +51,7 @@ import {
   resolveOrBootstrapRole,
   tryLinkPatientInvite,
   getClientIdForPatient,
+  isAdminRole,
 } from "../lib/clinicRole";
 import {
   CLINIC_TABLE_REGISTRY,
@@ -403,6 +405,10 @@ router.get(
       res.status(403).json({ error: "No role assigned" });
       return;
     }
+    if (!isAdminRole(role)) {
+      res.status(403).json({ error: "Fisioterapeutas e pacientes devem usar operações clínicas controladas" });
+      return;
+    }
 
     // Parse query modifiers
     const rawFilters = Array.isArray(req.query.filters)
@@ -437,7 +443,7 @@ router.get(
     // -----------------------------------------------------------------------
     // Admin scoping — all WHERE clauses use Drizzle camelCase properties
     // -----------------------------------------------------------------------
-    if (role === "admin") {
+    if (isAdminRole(role)) {
       // user_roles: only the current user's own row
       if (tableName === "user_roles") {
         const scopeWhere = eq(drizzleTable["userId"], userId);
@@ -477,6 +483,56 @@ router.get(
       const q = db.select().from(drizzleTable);
       const qw = combinedWhere ? q.where(combinedWhere) : q;
       res.json(await execQuery(qw, orderClauses, limit, single, drizzleTable));
+      return;
+    }
+
+    // Physiotherapists can only read patients and clinical records assigned
+    // to them. Assignment is checked server-side, never inferred from UI.
+    if (role === "physiotherapist") {
+      const assignmentRows = await db.select({ clientId: clinicAssignmentsTable.clientId })
+        .from(clinicAssignmentsTable)
+        .where(and(
+          eq(clinicAssignmentsTable.physiotherapistUserId, userId),
+          eq(clinicAssignmentsTable.status, "active"),
+        ));
+      const assignedClientIds = assignmentRows.map((row) => row.clientId);
+      if (assignedClientIds.length === 0) {
+        res.json(single ? null : []);
+        return;
+      }
+      if (tableName === "clients" || tableName === "appointments" || tableName === "patient_packages" || tableName === "session_plans") {
+        const scopedColumn = tableName === "clients" ? drizzleTable["id"] : drizzleTable["clientId"];
+        const scopeWhere = inArray(scopedColumn, assignedClientIds);
+        const combinedWhere = callerWhere ? and(scopeWhere, callerWhere) : scopeWhere;
+        const q = db.select().from(drizzleTable).where(combinedWhere);
+        res.json(await execQuery(q, orderClauses, limit, single, drizzleTable));
+        return;
+      }
+      if (tableName === "session_exercises" || tableName === "session_media") {
+        const assignedAppointments = await db.select({ id: appointmentsTable.id })
+          .from(appointmentsTable).where(inArray(appointmentsTable.clientId, assignedClientIds));
+        const appointmentIds = assignedAppointments.map((row) => row.id);
+        if (appointmentIds.length === 0) {
+          res.json(single ? null : []);
+          return;
+        }
+        const scopeWhere = inArray(drizzleTable["appointmentId"], appointmentIds);
+        const combinedWhere = callerWhere ? and(scopeWhere, callerWhere) : scopeWhere;
+        res.json(await execQuery(db.select().from(drizzleTable).where(combinedWhere), orderClauses, limit, single, drizzleTable));
+        return;
+      }
+      if (tableName === "availability_slots" || tableName === "services") {
+        const scopeWhere = eq(drizzleTable["userId"], userId);
+        const combinedWhere = callerWhere ? and(scopeWhere, callerWhere) : scopeWhere;
+        res.json(await execQuery(db.select().from(drizzleTable).where(combinedWhere), orderClauses, limit, single, drizzleTable));
+        return;
+      }
+      res.status(403).json({ error: "Recurso não disponível para fisioterapeutas" });
+      return;
+    }
+
+    if (role !== "patient") {
+      res.status(403).json({ error: "No valid clinic role" });
       return;
     }
 
@@ -1236,7 +1292,7 @@ router.delete(
     }
 
     const role = await resolveOrBootstrapRole(userId);
-    if (role !== "admin") {
+    if (!isAdminRole(role)) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }
@@ -1290,7 +1346,7 @@ router.post(
     }
 
     const role = await resolveOrBootstrapRole(userId);
-    if (role !== "admin") {
+    if (!isAdminRole(role)) {
       res
         .status(403)
         .json({ error: "Forbidden: only admins can invite patients" });
@@ -1628,11 +1684,24 @@ async function authorizeAppointmentForMedia(
   if (!appt) {
     return { ok: false, status: 404, error: "Appointment not found" };
   }
-  if (role === "admin") {
+  if (role === "admin" || role === "owner") {
     if (appt.userId !== userId) {
       return { ok: false, status: 403, error: "Appointment does not belong to you" };
     }
     return { ok: true };
+  }
+  if (role === "physiotherapist") {
+    const [assignment] = appt.clientId
+      ? await exec.select({ id: clinicAssignmentsTable.id })
+        .from(clinicAssignmentsTable)
+        .where(and(
+          eq(clinicAssignmentsTable.clientId, appt.clientId),
+          eq(clinicAssignmentsTable.physiotherapistUserId, userId),
+          eq(clinicAssignmentsTable.status, "active"),
+        )).limit(1)
+      : [];
+    if (assignment) return { ok: true };
+    return { ok: false, status: 403, error: "Appointment is not assigned to you" };
   }
   // patient
   if (!patientClientId || appt.clientId !== patientClientId) {
@@ -1695,8 +1764,8 @@ router.post(
     // a concurrent appointment change cannot slip past the auth window.
     // -----------------------------------------------------------------------
     const patientClientId =
-      role === "admin" ? null : await getClientIdForPatient(userId);
-    if (role !== "admin" && !patientClientId) {
+      role === "patient" ? await getClientIdForPatient(userId) : null;
+    if (role === "patient" && !patientClientId) {
       res.status(403).json({ error: "No linked client found for this patient" });
       return;
     }

@@ -4,6 +4,7 @@ import PackageTemplateManager from "@/components/PackageTemplateManager";
 import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { CalendarClock, ChevronRight } from "lucide-react";
+import TeamManager from "@/components/TeamManager";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ const Settings = () => {
       </header>
 
       <main className="mx-auto max-w-2xl space-y-6 px-4 pt-4">
+        <TeamManager />
         <Card className="rounded-sm cursor-pointer hover:bg-secondary/40" onClick={() => navigate("/disponibilidade")}>
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">

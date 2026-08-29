@@ -1,160 +1,137 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { supabase } from "@/integrations/supabase/client";
-import { createClinicBooking } from "@workspace/api-client-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { clinicApi, type PortalData } from "@/lib/clinicApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BrandLogo } from "@/components/BrandLogo";
-import { CalendarPlus, ChevronRight, LogOut } from "lucide-react";
+import { CalendarPlus, Check, ChevronRight, FileText, HelpCircle, LogOut, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 
-const db = supabase as any;
+const statusLabel: Record<string, string> = {
+  solicitado: "Aguardando confirmação",
+  agendado: "Agendado",
+  presenca_confirmada: "Presença confirmada",
+  reagendamento_solicitado: "Reagendamento solicitado",
+  cancelamento_solicitado: "Cancelamento solicitado",
+  atendido: "Concluído",
+};
 
 const PatientPortal = () => {
-  const { user, signOut } = useAuth();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
-  const [client, setClient] = useState<any>(null);
-  const [appointments, setAppointments] = useState<any[]>([]);
-  const [packages, setPackages] = useState<any[]>([]);
-  const [slots, setSlots] = useState<any[]>([]);
+  const location = useLocation();
+  const [data, setData] = useState<PortalData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [requestOpen, setRequestOpen] = useState(false);
+  const [confirming, setConfirming] = useState<{ id: string; action: "confirm_presence" | "request_reschedule" | "request_cancel" } | null>(null);
+  const [whatsappOptedIn, setWhatsappOptedIn] = useState<boolean | null>(null);
 
   const load = async () => {
-    if (!user) return;
-    const { data: cli } = await db.from("clients").select("*").eq("auth_user_id", user.id).maybeSingle();
-    setClient(cli);
-    if (!cli) return;
-
-    const today = format(new Date(), "yyyy-MM-dd");
-    const [{ data: appts }, { data: pkgs }, { data: openSlots }] = await Promise.all([
-      db.from("appointments").select("*").eq("client_id", cli.id).order("appointment_date", { ascending: false }).order("appointment_time", { ascending: false }).limit(20),
-      db.from("patient_packages").select("*").eq("client_id", cli.id).order("created_at", { ascending: false }),
-      db.from("availability_slots").select("*").eq("status", "aberto").gte("slot_date", today).order("slot_date").order("start_time").limit(30),
-    ]);
-    setAppointments(appts || []);
-    setPackages(pkgs || []);
-    setSlots(openSlots || []);
-  };
-
-  useEffect(() => { load(); }, [user]);
-
-  const requestSlot = async (slot: any) => {
-    if (!client) return;
-    // Atomic booking: creates the "solicitado" appointment and reserves the
-    // slot in a single server transaction (race-safe).
+    setLoading(true);
     try {
-      await createClinicBooking({ slotId: slot.id });
-    } catch (error: any) {
-      const message =
-        error?.status === 409
-          ? "Este horario acabou de ser reservado. Escolha outro."
-          : error?.message || "Nao foi possivel solicitar o horario.";
-      toast.error(message);
-      return;
+      const portal = await clinicApi.portal();
+      setData(portal);
+      const consent = await clinicApi.getConsent();
+      setWhatsappOptedIn(!!consent.optedIn);
     }
+    catch (error: any) { toast.error(error.message || "Não foi possível carregar seu portal"); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
 
-    toast.success("Horario solicitado. Aguarde confirmacao.");
-    setRequestOpen(false);
-    load();
+  useEffect(() => {
+    const action = new URLSearchParams(location.search).get("action");
+    const id = new URLSearchParams(location.search).get("appointment");
+    if (action && id && ["confirm_presence", "request_reschedule", "request_cancel"].includes(action)) {
+      setConfirming({ id, action: action as any });
+    }
+  }, [location.search]);
+
+  const today = format(new Date(), "yyyy-MM-dd");
+  const upcoming = useMemo(() => (data?.appointments ?? []).filter((a) =>
+    a.appointment_date >= today && !["atendido", "cancelado", "cancelamento_solicitado"].includes(a.status)
+  ), [data, today]);
+  const activePackage = data?.packages?.find((p) => p.status === "ativo");
+  const plans = data?.plans ?? [];
+  const exercises = data?.exercises ?? [];
+
+  const submitAction = async () => {
+    if (!confirming) return;
+    try {
+      await clinicApi.appointmentAction(confirming.id, {
+        action: confirming.action,
+        confirmed: true,
+        idempotencyKey: `${confirming.action}:${confirming.id}`,
+      });
+      toast.success(confirming.action === "confirm_presence" ? "Presença confirmada" : confirming.action === "request_cancel" ? "Pedido de cancelamento enviado" : "Pedido de reagendamento enviado");
+      setConfirming(null);
+      navigate("/meu-app", { replace: true });
+      await load();
+    } catch (error: any) { toast.error(error.message || "Não foi possível concluir a ação"); }
   };
 
-  const upcoming = appointments.filter((a) => a.status !== "atendido" && a.appointment_date >= format(new Date(), "yyyy-MM-dd"));
-  const past = appointments.filter((a) => a.status === "atendido").slice(0, 5);
-  const activePackage = packages.find((p) => p.status === "ativo");
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Carregando seu portal...</div>;
+  if (!data?.client) return <div className="p-6 text-center text-sm text-muted-foreground">Seu cadastro ainda não está vinculado a uma clínica.</div>;
 
   return (
-    <div className="pb-24">
+    <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 px-4 py-3 backdrop-blur-xl">
-        <div className="mx-auto max-w-2xl flex items-center justify-between">
+        <div className="mx-auto flex max-w-2xl items-center justify-between">
           <BrandLogo size="sm" />
-          <Button variant="ghost" size="icon" onClick={signOut}><LogOut className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sair"><LogOut className="h-4 w-4" /></Button>
         </div>
       </header>
-
-      <main className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
+      <main className="mx-auto max-w-2xl space-y-5 px-4 pt-5">
         <div>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Ola</p>
-          <h1 className="text-2xl font-semibold">{client?.name ?? "Paciente"}</h1>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">Seu portal de cuidado</p>
+          <h1 className="text-2xl font-semibold">{data.client.name}</h1>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {[
+            ["Início", "#inicio"], ["Agenda", "#agenda"], ["Plano", "#plano"], ["Ajuda", "#ajuda"],
+          ].map(([label, href]) => <a key={href} href={href} className="rounded-sm border border-border bg-card px-3 py-2 text-center text-xs font-medium hover:border-primary">{label}</a>)}
         </div>
 
-        {activePackage && (
-          <Card className="rounded-sm">
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Pacote ativo</p>
-                  <p className="text-sm font-semibold">{activePackage.name}</p>
-                </div>
-                <Badge variant="outline" className="rounded-sm">{activePackage.completed_sessions}/{activePackage.total_sessions}</Badge>
-              </div>
-              <Progress value={(activePackage.completed_sessions / activePackage.total_sessions) * 100} className="h-2" />
-            </CardContent>
-          </Card>
-        )}
-
-        <Button onClick={() => setRequestOpen(true)} className="w-full rounded-sm gap-2">
-          <CalendarPlus className="h-4 w-4" /> Solicitar sessao
-        </Button>
-
-        <section className="space-y-2">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Proximas sessoes</p>
-          {upcoming.length === 0 ? (
-            <Card className="rounded-sm border-dashed"><CardContent className="py-6 text-center text-sm text-muted-foreground">Sem sessoes agendadas.</CardContent></Card>
-          ) : (
-            upcoming.map((a) => (
-              <button key={a.id} onClick={() => navigate(`/meu-app/sessao/${a.id}`)} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-sm border border-border bg-card p-3 text-left hover:border-foreground/30">
-                <div>
-                  <p className="text-sm font-semibold">{format(new Date(a.appointment_date + "T12:00:00"), "EEE, dd MMM", { locale: ptBR })} · {a.appointment_time?.slice(0,5)}</p>
-                  <p className="text-xs text-muted-foreground">{a.service}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={a.status === "solicitado" ? "outline" : "default"} className="rounded-sm capitalize">{a.status}</Badge>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </button>
-            ))
-          )}
+        <section id="inicio" className="space-y-3">
+          {activePackage && <Card className="rounded-sm"><CardContent className="space-y-3 p-4">
+            <div className="flex items-start justify-between"><div><p className="text-xs uppercase tracking-wider text-muted-foreground">Pacote ativo</p><p className="font-semibold">{activePackage.name}</p></div><Badge variant="outline" className="rounded-sm">{activePackage.completed_sessions}/{activePackage.total_sessions}</Badge></div>
+            <Progress value={activePackage.total_sessions ? (activePackage.completed_sessions / activePackage.total_sessions) * 100 : 0} className="h-2" />
+            <p className="text-xs text-muted-foreground">Saldo: {Math.max(0, Number(activePackage.total_sessions) - Number(activePackage.completed_sessions))} sessões</p>
+          </CardContent></Card>}
+          <Button onClick={() => setRequestOpen(true)} className="w-full rounded-sm gap-2"><CalendarPlus className="h-4 w-4" /> Solicitar sessão</Button>
         </section>
 
-        {past.length > 0 && (
-          <section className="space-y-2">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Ultimas sessoes</p>
-            {past.map((a) => (
-              <button key={a.id} onClick={() => navigate(`/meu-app/sessao/${a.id}`)} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-sm border border-border bg-card p-3 text-left hover:border-foreground/30">
-                <div>
-                  <p className="text-sm font-semibold">{format(new Date(a.appointment_date + "T12:00:00"), "dd MMM yyyy", { locale: ptBR })}</p>
-                  <p className="text-xs text-muted-foreground">{a.service}{a.pain_scale != null ? ` · dor ${a.pain_scale}/10` : ""}</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        <section id="agenda" className="space-y-2">
+          <div className="flex items-center justify-between"><p className="text-xs uppercase tracking-wider text-muted-foreground">Agenda</p><span className="text-xs text-muted-foreground">{upcoming.length} próximas</span></div>
+          {upcoming.length === 0 ? <Card className="rounded-sm border-dashed"><CardContent className="py-6 text-center text-sm text-muted-foreground">Nenhuma sessão próxima.</CardContent></Card> :
+            upcoming.map((a) => <Card key={a.id} className="rounded-sm"><CardContent className="flex items-center justify-between gap-3 p-3">
+              <button className="min-w-0 flex-1 text-left" onClick={() => navigate(`/meu-app/sessao/${a.id}`)}>
+                <p className="text-sm font-semibold">{format(new Date(`${a.appointment_date}T12:00:00`), "EEE, dd MMM", { locale: ptBR })} · {a.appointment_time?.slice(0, 5)}</p>
+                <p className="text-xs text-muted-foreground">{a.service} · {statusLabel[a.status] ?? a.status}</p>
               </button>
-            ))}
-          </section>
-        )}
+              <div className="flex gap-1"><Button variant="ghost" size="icon" title="Confirmar presença" onClick={() => setConfirming({ id: a.id, action: "confirm_presence" })}><Check className="h-4 w-4 text-primary" /></Button><Button variant="ghost" size="icon" title="Reagendar" onClick={() => setConfirming({ id: a.id, action: "request_reschedule" })}><ChevronRight className="h-4 w-4" /></Button><Button variant="ghost" size="icon" title="Solicitar cancelamento" onClick={() => setConfirming({ id: a.id, action: "request_cancel" })}><X className="h-4 w-4 text-destructive" /></Button></div>
+            </CardContent></Card>)}
+        </section>
+
+        <section id="plano" className="space-y-3">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">Plano e exercícios</p>
+          {plans.length === 0 ? <Card className="rounded-sm border-dashed"><CardContent className="py-5 text-sm text-muted-foreground">Seu fisioterapeuta ainda não publicou um plano.</CardContent></Card> : plans.slice(0, 3).map((p) => <Card key={p.id} className="rounded-sm"><CardContent className="space-y-1 p-4"><p className="flex items-center gap-2 font-semibold"><FileText className="h-4 w-4 text-primary" />{p.title}</p>{p.content && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{p.content}</p>}{p.tips && <p className="text-xs text-muted-foreground"><b>Dicas:</b> {p.tips}</p>}</CardContent></Card>)}
+          {exercises.length > 0 && <Card className="rounded-sm"><CardContent className="p-4"><p className="mb-2 text-sm font-semibold">Exercícios acompanhados</p><p className="text-sm text-muted-foreground">{exercises.filter((e) => e.completed_at).length} de {exercises.length} concluídos</p></CardContent></Card>}
+        </section>
+
+        <section id="ajuda" className="rounded-sm border border-border bg-card p-4"><p className="flex items-center gap-2 font-semibold"><HelpCircle className="h-4 w-4 text-primary" /> Precisa de ajuda?</p><p className="mt-1 text-sm text-muted-foreground">Use o WhatsApp da clínica para dúvidas sobre sua agenda ou plano. Não envie informações clínicas sensíveis por mensagem.</p></section>
+        <section className="flex items-center justify-between gap-3 rounded-sm border border-border bg-card p-4"><div><p className="text-sm font-semibold">Lembretes pelo WhatsApp</p><p className="text-xs text-muted-foreground">Somente horários e links seguros, sem dados clínicos.</p></div><Button variant="outline" size="sm" className="shrink-0 rounded-sm" onClick={async () => { try { const next = !whatsappOptedIn; await clinicApi.consent({ optedIn: next }); setWhatsappOptedIn(next); toast.success(next ? "Lembretes ativados" : "Lembretes desativados"); } catch (error: any) { toast.error(error.message || "Não foi possível atualizar a preferência"); } }}>{whatsappOptedIn ? "Desativar" : "Ativar"}</Button></section>
+        <section className="flex items-center gap-2 border-t border-border pt-4 text-xs text-muted-foreground"><UserRound className="h-4 w-4" /> Seus dados são exibidos somente para você e sua equipe responsável.</section>
       </main>
 
-      <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
-        <DialogContent className="max-w-sm rounded-sm max-h-[80vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Solicitar sessao</DialogTitle></DialogHeader>
-          {slots.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">Sem horarios disponiveis.</p>
-          ) : (
-            <div className="space-y-2">
-              {slots.map((s) => (
-                <button key={s.id} onClick={() => requestSlot(s)} className="w-full rounded-sm border border-border p-3 text-left hover:border-primary">
-                  <p className="text-sm font-semibold capitalize">{format(new Date(s.slot_date + "T12:00:00"), "EEE, dd MMM", { locale: ptBR })}</p>
-                  <p className="text-xs text-muted-foreground tabular-nums">{s.start_time.slice(0,5)} - {s.end_time.slice(0,5)}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <Dialog open={!!confirming} onOpenChange={(open) => !open && setConfirming(null)}><DialogContent className="max-w-sm rounded-sm"><DialogHeader><DialogTitle>Confirmar ação</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">{confirming?.action === "confirm_presence" ? "Você confirma sua presença nesta sessão?" : confirming?.action === "request_cancel" ? "Deseja solicitar o cancelamento desta sessão?" : "Deseja solicitar um novo horário para esta sessão?"}</p><Button onClick={submitAction} className="w-full rounded-sm">Confirmar</Button></DialogContent></Dialog>
+      <Dialog open={requestOpen} onOpenChange={setRequestOpen}><DialogContent className="max-w-sm rounded-sm"><DialogHeader><DialogTitle>Solicitar sessão</DialogTitle></DialogHeader>{(data.availableSlots ?? []).length === 0 ? <p className="py-4 text-sm text-muted-foreground">Não há horários disponíveis no momento.</p> : <div className="space-y-2">{data.availableSlots.map((slot) => <button key={slot.id} onClick={async () => { try { const { createClinicBooking } = await import("@workspace/api-client-react"); await createClinicBooking({ slotId: slot.id }); toast.success("Horário solicitado"); setRequestOpen(false); load(); } catch (error: any) { toast.error(error.message || "Horário indisponível"); } }} className="w-full rounded-sm border border-border p-3 text-left hover:border-primary"><p className="text-sm font-semibold">{format(new Date(`${slot.slot_date}T12:00:00`), "EEE, dd MMM", { locale: ptBR })}</p><p className="text-xs text-muted-foreground">{slot.start_time?.slice(0, 5)} – {slot.end_time?.slice(0, 5)}</p></button>)}</div>}</DialogContent></Dialog>
     </div>
   );
 };

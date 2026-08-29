@@ -22,8 +22,173 @@ export const HealthCheckResponse = zod.object({
  */
 export const GetClinicSessionResponse = zod.object({
   "userId": zod.string(),
-  "role": zod.union([zod.literal('admin'),zod.literal('patient'),zod.literal(null)]).nullable()
+  "role": zod.union([zod.literal('owner'),zod.literal('admin'),zod.literal('physiotherapist'),zod.literal('patient'),zod.literal(null)]).nullable()
 })
+
+
+/**
+ * @summary Current clinic membership and role
+ */
+export const GetClinicContextResponse = zod.object({
+  "clinicId": zod.string(),
+  "userId": zod.string(),
+  "role": zod.enum(['owner', 'admin', 'physiotherapist', 'patient']),
+  "clinic": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+/**
+ * @summary List active and revoked clinic members
+ */
+export const ListClinicMembersResponseItem = zod.record(zod.string(), zod.unknown())
+export const ListClinicMembersResponse = zod.array(ListClinicMembersResponseItem)
+
+
+/**
+ * @summary Invite a clinic administrator or physiotherapist
+ */
+export const InviteClinicMemberBody = zod.object({
+  "email": zod.string(),
+  "role": zod.enum(['admin', 'physiotherapist'])
+})
+
+export const InviteClinicMemberResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Accept a clinic invitation
+ */
+export const AcceptClinicMemberInvitationParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const AcceptClinicMemberInvitationResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Change a member role or revoke access
+ */
+export const UpdateClinicMemberParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateClinicMemberBody = zod.object({
+  "role": zod.enum(['admin', 'physiotherapist']).optional(),
+  "status": zod.enum(['active', 'revoked']).optional()
+})
+
+export const UpdateClinicMemberResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary List patient responsibilities
+ */
+export const ListClinicAssignmentsResponseItem = zod.record(zod.string(), zod.unknown())
+export const ListClinicAssignmentsResponse = zod.array(ListClinicAssignmentsResponseItem)
+
+
+/**
+ * @summary Assign or unassign a physiotherapist
+ */
+export const AssignClinicPatientBody = zod.object({
+  "clientId": zod.string(),
+  "physiotherapistUserId": zod.string().nullish()
+})
+
+export const AssignClinicPatientResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary List clinic changes and clinical access events
+ */
+export const ListClinicAuditEventsResponseItem = zod.record(zod.string(), zod.unknown())
+export const ListClinicAuditEventsResponse = zod.array(ListClinicAuditEventsResponseItem)
+
+
+/**
+ * @summary Authenticated patient portal data
+ */
+export const GetPatientPortalResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Appointment detail for the patient or responsible professional
+ */
+export const GetPortalAppointmentParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetPortalAppointmentResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Confirm, cancel, or request rescheduling
+ */
+export const PerformPortalAppointmentActionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const PerformPortalAppointmentActionBody = zod.object({
+  "action": zod.enum(['confirm_presence', 'request_reschedule', 'request_cancel']),
+  "confirmed": zod.literal(true),
+  "idempotencyKey": zod.string(),
+  "requestedSlotId": zod.string().optional()
+})
+
+export const PerformPortalAppointmentActionResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Transfer an appointment to an active physiotherapist
+ */
+export const TransferClinicAppointmentParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const TransferClinicAppointmentBody = zod.object({
+  "physiotherapistUserId": zod.string()
+})
+
+export const TransferClinicAppointmentResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Read WhatsApp consent for a patient
+ */
+export const GetWhatsappConsentResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Opt in or out of clinic WhatsApp messages
+ */
+export const UpdateWhatsappConsentBody = zod.object({
+  "clientId": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "optedIn": zod.boolean()
+})
+
+export const UpdateWhatsappConsentResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary List WhatsApp delivery history
+ */
+export const ListWhatsappOutboxResponseItem = zod.record(zod.string(), zod.unknown())
+export const ListWhatsappOutboxResponse = zod.array(ListWhatsappOutboxResponseItem)
+
+
+/**
+ * @summary Queue a consented WhatsApp message
+ */
+export const EnqueueWhatsappMessageBody = zod.object({
+  "clientId": zod.string(),
+  "eventType": zod.string(),
+  "idempotencyKey": zod.string(),
+  "payload": zod.record(zod.string(), zod.unknown()).optional(),
+  "fallbackText": zod.string()
+})
+
+export const EnqueueWhatsappMessageResponse = zod.record(zod.string(), zod.unknown())
 
 
 /**

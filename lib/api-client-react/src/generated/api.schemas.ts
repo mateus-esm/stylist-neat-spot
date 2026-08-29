@@ -16,7 +16,9 @@ export type ClinicSessionRole = typeof ClinicSessionRole[keyof typeof ClinicSess
 
 
 export const ClinicSessionRole = {
+  owner: 'owner',
   admin: 'admin',
+  physiotherapist: 'physiotherapist',
   patient: 'patient',
 } as const;
 
@@ -24,6 +26,105 @@ export interface ClinicSession {
   userId: string;
   /** @nullable */
   role: ClinicSessionRole;
+}
+
+export type ClinicContextRole = typeof ClinicContextRole[keyof typeof ClinicContextRole];
+
+
+export const ClinicContextRole = {
+  owner: 'owner',
+  admin: 'admin',
+  physiotherapist: 'physiotherapist',
+  patient: 'patient',
+} as const;
+
+export interface Clinic { [key: string]: unknown }
+
+export interface ClinicContext {
+  clinicId: string;
+  userId: string;
+  role: ClinicContextRole;
+  clinic?: Clinic;
+}
+
+export interface ClinicMember { [key: string]: unknown }
+
+export type ClinicMemberInviteInputRole = typeof ClinicMemberInviteInputRole[keyof typeof ClinicMemberInviteInputRole];
+
+
+export const ClinicMemberInviteInputRole = {
+  admin: 'admin',
+  physiotherapist: 'physiotherapist',
+} as const;
+
+export interface ClinicMemberInviteInput {
+  email: string;
+  role: ClinicMemberInviteInputRole;
+}
+
+export interface ClinicMemberInvitation { [key: string]: unknown }
+
+export type ClinicMemberUpdateRole = typeof ClinicMemberUpdateRole[keyof typeof ClinicMemberUpdateRole];
+
+
+export const ClinicMemberUpdateRole = {
+  admin: 'admin',
+  physiotherapist: 'physiotherapist',
+} as const;
+
+export type ClinicMemberUpdateStatus = typeof ClinicMemberUpdateStatus[keyof typeof ClinicMemberUpdateStatus];
+
+
+export const ClinicMemberUpdateStatus = {
+  active: 'active',
+  revoked: 'revoked',
+} as const;
+
+export interface ClinicMemberUpdate {
+  role?: ClinicMemberUpdateRole;
+  status?: ClinicMemberUpdateStatus;
+}
+
+export interface ClinicAssignment { [key: string]: unknown }
+
+export interface ClinicAssignmentInput {
+  clientId: string;
+  /** @nullable */
+  physiotherapistUserId?: string | null;
+}
+
+export interface PatientPortal { [key: string]: unknown }
+
+export type PortalAppointmentActionInputAction = typeof PortalAppointmentActionInputAction[keyof typeof PortalAppointmentActionInputAction];
+
+
+export const PortalAppointmentActionInputAction = {
+  confirm_presence: 'confirm_presence',
+  request_reschedule: 'request_reschedule',
+  request_cancel: 'request_cancel',
+} as const;
+
+export interface PortalAppointmentActionInput {
+  action: PortalAppointmentActionInputAction;
+  confirmed: true;
+  idempotencyKey: string;
+  requestedSlotId?: string;
+}
+
+export interface WhatsappConsentInput {
+  clientId?: string;
+  phone?: string;
+  optedIn: boolean;
+}
+
+export type WhatsappOutboxInputPayload = { [key: string]: unknown };
+
+export interface WhatsappOutboxInput {
+  clientId: string;
+  eventType: string;
+  idempotencyKey: string;
+  payload?: WhatsappOutboxInputPayload;
+  fallbackText: string;
 }
 
 export interface ClinicRecord { [key: string]: unknown }
@@ -55,6 +156,28 @@ export interface AppointmentMediaInput {
   mediaType?: string;
   caption?: string;
 }
+
+export type AcceptClinicMemberInvitation200 = { [key: string]: unknown };
+
+export type ListClinicAuditEvents200Item = { [key: string]: unknown };
+
+export type GetPortalAppointment200 = { [key: string]: unknown };
+
+export type PerformPortalAppointmentAction200 = { [key: string]: unknown };
+
+export type TransferClinicAppointmentBody = {
+  physiotherapistUserId: string;
+};
+
+export type TransferClinicAppointment200 = { [key: string]: unknown };
+
+export type GetWhatsappConsent200 = { [key: string]: unknown };
+
+export type UpdateWhatsappConsent200 = { [key: string]: unknown };
+
+export type ListWhatsappOutbox200Item = { [key: string]: unknown };
+
+export type EnqueueWhatsappMessage201 = { [key: string]: unknown };
 
 export type ListClinicRecordsParams = {
 filters?: string;

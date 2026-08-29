@@ -15,6 +15,8 @@ export const clientsTable = pgTable("clients", {
   pastSurgeries: text("past_surgeries"),
   primaryComplaints: text("primary_complaints"),
   authUserId: text("auth_user_id").unique(),
+  clinicId: uuid("clinic_id"),
+  assignedToUserId: text("assigned_to_user_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

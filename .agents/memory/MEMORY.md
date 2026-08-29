@@ -1,1 +1,2 @@
 - [Clinic authorization boundaries](clinic-authorization-boundaries.md) — bookings and media use controlled server flows; do not re-open generic data mutations for convenience.
+- [API Zod generated exports](api-zod-generated-exports.md) — keep explicit type exports because generated schemas and declarations can collide.

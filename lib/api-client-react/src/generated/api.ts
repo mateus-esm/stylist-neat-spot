@@ -20,17 +20,38 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AcceptClinicMemberInvitation200,
   AppointmentMediaInput,
+  ClinicAssignment,
+  ClinicAssignmentInput,
   ClinicBooking,
   ClinicBookingInput,
+  ClinicContext,
+  ClinicMember,
+  ClinicMemberInvitation,
+  ClinicMemberInviteInput,
+  ClinicMemberUpdate,
   ClinicRecord,
   ClinicRecordInput,
   ClinicRecordList,
   ClinicSession,
+  EnqueueWhatsappMessage201,
+  GetPortalAppointment200,
+  GetWhatsappConsent200,
   HealthStatus,
+  ListClinicAuditEvents200Item,
   ListClinicRecordsParams,
+  ListWhatsappOutbox200Item,
   PatientInvite,
-  PatientInviteInput
+  PatientInviteInput,
+  PatientPortal,
+  PerformPortalAppointmentAction200,
+  PortalAppointmentActionInput,
+  TransferClinicAppointment200,
+  TransferClinicAppointmentBody,
+  UpdateWhatsappConsent200,
+  WhatsappConsentInput,
+  WhatsappOutboxInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -214,6 +235,1193 @@ export function useGetClinicSession<TData = Awaited<ReturnType<typeof getClinicS
 
 
 
+
+export const getGetClinicContextUrl = () => {
+
+
+
+
+  return `/api/clinic/context`
+}
+
+/**
+ * @summary Current clinic membership and role
+ */
+export const getClinicContext = async ( options?: Parameters<typeof customFetch>[1]): Promise<ClinicContext> => {
+
+  return customFetch<ClinicContext>(getGetClinicContextUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetClinicContextQueryKey = () => {
+    return [
+    `/api/clinic/context`
+    ] as const;
+    }
+
+
+export const getGetClinicContextQueryOptions = <TData = Awaited<ReturnType<typeof getClinicContext>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClinicContext>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetClinicContextQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getClinicContext>>> = ({ signal }) => getClinicContext({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getClinicContext>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetClinicContextQueryResult = NonNullable<Awaited<ReturnType<typeof getClinicContext>>>
+export type GetClinicContextQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Current clinic membership and role
+ */
+
+export function useGetClinicContext<TData = Awaited<ReturnType<typeof getClinicContext>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClinicContext>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetClinicContextQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListClinicMembersUrl = () => {
+
+
+
+
+  return `/api/clinic/members`
+}
+
+/**
+ * @summary List active and revoked clinic members
+ */
+export const listClinicMembers = async ( options?: Parameters<typeof customFetch>[1]): Promise<ClinicMember[]> => {
+
+  return customFetch<ClinicMember[]>(getListClinicMembersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListClinicMembersQueryKey = () => {
+    return [
+    `/api/clinic/members`
+    ] as const;
+    }
+
+
+export const getListClinicMembersQueryOptions = <TData = Awaited<ReturnType<typeof listClinicMembers>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClinicMembers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListClinicMembersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listClinicMembers>>> = ({ signal }) => listClinicMembers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listClinicMembers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListClinicMembersQueryResult = NonNullable<Awaited<ReturnType<typeof listClinicMembers>>>
+export type ListClinicMembersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List active and revoked clinic members
+ */
+
+export function useListClinicMembers<TData = Awaited<ReturnType<typeof listClinicMembers>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClinicMembers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListClinicMembersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getInviteClinicMemberUrl = () => {
+
+
+
+
+  return `/api/clinic/members/invitations`
+}
+
+/**
+ * @summary Invite a clinic administrator or physiotherapist
+ */
+export const inviteClinicMember = async (clinicMemberInviteInput: ClinicMemberInviteInput, options?: Parameters<typeof customFetch>[1]): Promise<ClinicMemberInvitation> => {
+
+  return customFetch<ClinicMemberInvitation>(getInviteClinicMemberUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(clinicMemberInviteInput)
+  }
+);}
+
+
+
+
+
+export const getInviteClinicMemberMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteClinicMember>>, TError,{data: BodyType<ClinicMemberInviteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof inviteClinicMember>>, TError,{data: BodyType<ClinicMemberInviteInput>}, TContext> => {
+
+const mutationKey = ['inviteClinicMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof inviteClinicMember>>, {data: BodyType<ClinicMemberInviteInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  inviteClinicMember(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InviteClinicMemberMutationResult = NonNullable<Awaited<ReturnType<typeof inviteClinicMember>>>
+    export type InviteClinicMemberMutationBody = BodyType<ClinicMemberInviteInput>
+    export type InviteClinicMemberMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Invite a clinic administrator or physiotherapist
+ */
+export const useInviteClinicMember = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteClinicMember>>, TError,{data: BodyType<ClinicMemberInviteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof inviteClinicMember>>,
+        TError,
+        {data: BodyType<ClinicMemberInviteInput>},
+        TContext
+      > => {
+      return useMutation(getInviteClinicMemberMutationOptions(options));
+    }
+
+export const getAcceptClinicMemberInvitationUrl = (token: string,) => {
+
+
+
+
+  return `/api/clinic/members/invitations/${token}/accept`
+}
+
+/**
+ * @summary Accept a clinic invitation
+ */
+export const acceptClinicMemberInvitation = async (token: string, options?: Parameters<typeof customFetch>[1]): Promise<AcceptClinicMemberInvitation200> => {
+
+  return customFetch<AcceptClinicMemberInvitation200>(getAcceptClinicMemberInvitationUrl(token),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getAcceptClinicMemberInvitationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptClinicMemberInvitation>>, TError,{token: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof acceptClinicMemberInvitation>>, TError,{token: string}, TContext> => {
+
+const mutationKey = ['acceptClinicMemberInvitation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acceptClinicMemberInvitation>>, {token: string}> = (props) => {
+          const {token} = props ?? {};
+
+          return  acceptClinicMemberInvitation(token,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AcceptClinicMemberInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof acceptClinicMemberInvitation>>>
+
+    export type AcceptClinicMemberInvitationMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Accept a clinic invitation
+ */
+export const useAcceptClinicMemberInvitation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptClinicMemberInvitation>>, TError,{token: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof acceptClinicMemberInvitation>>,
+        TError,
+        {token: string},
+        TContext
+      > => {
+      return useMutation(getAcceptClinicMemberInvitationMutationOptions(options));
+    }
+
+export const getUpdateClinicMemberUrl = (id: string,) => {
+
+
+
+
+  return `/api/clinic/members/${id}`
+}
+
+/**
+ * @summary Change a member role or revoke access
+ */
+export const updateClinicMember = async (id: string,
+    clinicMemberUpdate: ClinicMemberUpdate, options?: Parameters<typeof customFetch>[1]): Promise<ClinicMember> => {
+
+  return customFetch<ClinicMember>(getUpdateClinicMemberUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(clinicMemberUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateClinicMemberMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateClinicMember>>, TError,{id: string;data: BodyType<ClinicMemberUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateClinicMember>>, TError,{id: string;data: BodyType<ClinicMemberUpdate>}, TContext> => {
+
+const mutationKey = ['updateClinicMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateClinicMember>>, {id: string;data: BodyType<ClinicMemberUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateClinicMember(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateClinicMemberMutationResult = NonNullable<Awaited<ReturnType<typeof updateClinicMember>>>
+    export type UpdateClinicMemberMutationBody = BodyType<ClinicMemberUpdate>
+    export type UpdateClinicMemberMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Change a member role or revoke access
+ */
+export const useUpdateClinicMember = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateClinicMember>>, TError,{id: string;data: BodyType<ClinicMemberUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateClinicMember>>,
+        TError,
+        {id: string;data: BodyType<ClinicMemberUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateClinicMemberMutationOptions(options));
+    }
+
+export const getListClinicAssignmentsUrl = () => {
+
+
+
+
+  return `/api/clinic/assignments`
+}
+
+/**
+ * @summary List patient responsibilities
+ */
+export const listClinicAssignments = async ( options?: Parameters<typeof customFetch>[1]): Promise<ClinicAssignment[]> => {
+
+  return customFetch<ClinicAssignment[]>(getListClinicAssignmentsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListClinicAssignmentsQueryKey = () => {
+    return [
+    `/api/clinic/assignments`
+    ] as const;
+    }
+
+
+export const getListClinicAssignmentsQueryOptions = <TData = Awaited<ReturnType<typeof listClinicAssignments>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClinicAssignments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListClinicAssignmentsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listClinicAssignments>>> = ({ signal }) => listClinicAssignments({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listClinicAssignments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListClinicAssignmentsQueryResult = NonNullable<Awaited<ReturnType<typeof listClinicAssignments>>>
+export type ListClinicAssignmentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List patient responsibilities
+ */
+
+export function useListClinicAssignments<TData = Awaited<ReturnType<typeof listClinicAssignments>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClinicAssignments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListClinicAssignmentsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAssignClinicPatientUrl = () => {
+
+
+
+
+  return `/api/clinic/assignments`
+}
+
+/**
+ * @summary Assign or unassign a physiotherapist
+ */
+export const assignClinicPatient = async (clinicAssignmentInput: ClinicAssignmentInput, options?: Parameters<typeof customFetch>[1]): Promise<ClinicAssignment> => {
+
+  return customFetch<ClinicAssignment>(getAssignClinicPatientUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(clinicAssignmentInput)
+  }
+);}
+
+
+
+
+
+export const getAssignClinicPatientMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignClinicPatient>>, TError,{data: BodyType<ClinicAssignmentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof assignClinicPatient>>, TError,{data: BodyType<ClinicAssignmentInput>}, TContext> => {
+
+const mutationKey = ['assignClinicPatient'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof assignClinicPatient>>, {data: BodyType<ClinicAssignmentInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  assignClinicPatient(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AssignClinicPatientMutationResult = NonNullable<Awaited<ReturnType<typeof assignClinicPatient>>>
+    export type AssignClinicPatientMutationBody = BodyType<ClinicAssignmentInput>
+    export type AssignClinicPatientMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Assign or unassign a physiotherapist
+ */
+export const useAssignClinicPatient = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignClinicPatient>>, TError,{data: BodyType<ClinicAssignmentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof assignClinicPatient>>,
+        TError,
+        {data: BodyType<ClinicAssignmentInput>},
+        TContext
+      > => {
+      return useMutation(getAssignClinicPatientMutationOptions(options));
+    }
+
+export const getListClinicAuditEventsUrl = () => {
+
+
+
+
+  return `/api/clinic/audit`
+}
+
+/**
+ * @summary List clinic changes and clinical access events
+ */
+export const listClinicAuditEvents = async ( options?: Parameters<typeof customFetch>[1]): Promise<ListClinicAuditEvents200Item[]> => {
+
+  return customFetch<ListClinicAuditEvents200Item[]>(getListClinicAuditEventsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListClinicAuditEventsQueryKey = () => {
+    return [
+    `/api/clinic/audit`
+    ] as const;
+    }
+
+
+export const getListClinicAuditEventsQueryOptions = <TData = Awaited<ReturnType<typeof listClinicAuditEvents>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClinicAuditEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListClinicAuditEventsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listClinicAuditEvents>>> = ({ signal }) => listClinicAuditEvents({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listClinicAuditEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListClinicAuditEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listClinicAuditEvents>>>
+export type ListClinicAuditEventsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List clinic changes and clinical access events
+ */
+
+export function useListClinicAuditEvents<TData = Awaited<ReturnType<typeof listClinicAuditEvents>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClinicAuditEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListClinicAuditEventsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPatientPortalUrl = () => {
+
+
+
+
+  return `/api/clinic/portal`
+}
+
+/**
+ * @summary Authenticated patient portal data
+ */
+export const getPatientPortal = async ( options?: Parameters<typeof customFetch>[1]): Promise<PatientPortal> => {
+
+  return customFetch<PatientPortal>(getGetPatientPortalUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPatientPortalQueryKey = () => {
+    return [
+    `/api/clinic/portal`
+    ] as const;
+    }
+
+
+export const getGetPatientPortalQueryOptions = <TData = Awaited<ReturnType<typeof getPatientPortal>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatientPortal>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPatientPortalQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPatientPortal>>> = ({ signal }) => getPatientPortal({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPatientPortal>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPatientPortalQueryResult = NonNullable<Awaited<ReturnType<typeof getPatientPortal>>>
+export type GetPatientPortalQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Authenticated patient portal data
+ */
+
+export function useGetPatientPortal<TData = Awaited<ReturnType<typeof getPatientPortal>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatientPortal>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPatientPortalQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetPortalAppointmentUrl = (id: string,) => {
+
+
+
+
+  return `/api/clinic/portal/appointments/${id}`
+}
+
+/**
+ * @summary Appointment detail for the patient or responsible professional
+ */
+export const getPortalAppointment = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<GetPortalAppointment200> => {
+
+  return customFetch<GetPortalAppointment200>(getGetPortalAppointmentUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPortalAppointmentQueryKey = (id: string,) => {
+    return [
+    `/api/clinic/portal/appointments/${id}`
+    ] as const;
+    }
+
+
+export const getGetPortalAppointmentQueryOptions = <TData = Awaited<ReturnType<typeof getPortalAppointment>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPortalAppointment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPortalAppointmentQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPortalAppointment>>> = ({ signal }) => getPortalAppointment(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPortalAppointment>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPortalAppointmentQueryResult = NonNullable<Awaited<ReturnType<typeof getPortalAppointment>>>
+export type GetPortalAppointmentQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Appointment detail for the patient or responsible professional
+ */
+
+export function useGetPortalAppointment<TData = Awaited<ReturnType<typeof getPortalAppointment>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPortalAppointment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPortalAppointmentQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPerformPortalAppointmentActionUrl = (id: string,) => {
+
+
+
+
+  return `/api/clinic/portal/appointments/${id}/actions`
+}
+
+/**
+ * @summary Confirm, cancel, or request rescheduling
+ */
+export const performPortalAppointmentAction = async (id: string,
+    portalAppointmentActionInput: PortalAppointmentActionInput, options?: Parameters<typeof customFetch>[1]): Promise<PerformPortalAppointmentAction200> => {
+
+  return customFetch<PerformPortalAppointmentAction200>(getPerformPortalAppointmentActionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(portalAppointmentActionInput)
+  }
+);}
+
+
+
+
+
+export const getPerformPortalAppointmentActionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof performPortalAppointmentAction>>, TError,{id: string;data: BodyType<PortalAppointmentActionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof performPortalAppointmentAction>>, TError,{id: string;data: BodyType<PortalAppointmentActionInput>}, TContext> => {
+
+const mutationKey = ['performPortalAppointmentAction'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof performPortalAppointmentAction>>, {id: string;data: BodyType<PortalAppointmentActionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  performPortalAppointmentAction(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PerformPortalAppointmentActionMutationResult = NonNullable<Awaited<ReturnType<typeof performPortalAppointmentAction>>>
+    export type PerformPortalAppointmentActionMutationBody = BodyType<PortalAppointmentActionInput>
+    export type PerformPortalAppointmentActionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Confirm, cancel, or request rescheduling
+ */
+export const usePerformPortalAppointmentAction = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof performPortalAppointmentAction>>, TError,{id: string;data: BodyType<PortalAppointmentActionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof performPortalAppointmentAction>>,
+        TError,
+        {id: string;data: BodyType<PortalAppointmentActionInput>},
+        TContext
+      > => {
+      return useMutation(getPerformPortalAppointmentActionMutationOptions(options));
+    }
+
+export const getTransferClinicAppointmentUrl = (id: string,) => {
+
+
+
+
+  return `/api/clinic/appointments/${id}/transfer`
+}
+
+/**
+ * @summary Transfer an appointment to an active physiotherapist
+ */
+export const transferClinicAppointment = async (id: string,
+    transferClinicAppointmentBody: TransferClinicAppointmentBody, options?: Parameters<typeof customFetch>[1]): Promise<TransferClinicAppointment200> => {
+
+  return customFetch<TransferClinicAppointment200>(getTransferClinicAppointmentUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(transferClinicAppointmentBody)
+  }
+);}
+
+
+
+
+
+export const getTransferClinicAppointmentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferClinicAppointment>>, TError,{id: string;data: BodyType<TransferClinicAppointmentBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transferClinicAppointment>>, TError,{id: string;data: BodyType<TransferClinicAppointmentBody>}, TContext> => {
+
+const mutationKey = ['transferClinicAppointment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transferClinicAppointment>>, {id: string;data: BodyType<TransferClinicAppointmentBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  transferClinicAppointment(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransferClinicAppointmentMutationResult = NonNullable<Awaited<ReturnType<typeof transferClinicAppointment>>>
+    export type TransferClinicAppointmentMutationBody = BodyType<TransferClinicAppointmentBody>
+    export type TransferClinicAppointmentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Transfer an appointment to an active physiotherapist
+ */
+export const useTransferClinicAppointment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferClinicAppointment>>, TError,{id: string;data: BodyType<TransferClinicAppointmentBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transferClinicAppointment>>,
+        TError,
+        {id: string;data: BodyType<TransferClinicAppointmentBody>},
+        TContext
+      > => {
+      return useMutation(getTransferClinicAppointmentMutationOptions(options));
+    }
+
+export const getGetWhatsappConsentUrl = () => {
+
+
+
+
+  return `/api/clinic/whatsapp/consent`
+}
+
+/**
+ * @summary Read WhatsApp consent for a patient
+ */
+export const getWhatsappConsent = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetWhatsappConsent200> => {
+
+  return customFetch<GetWhatsappConsent200>(getGetWhatsappConsentUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWhatsappConsentQueryKey = () => {
+    return [
+    `/api/clinic/whatsapp/consent`
+    ] as const;
+    }
+
+
+export const getGetWhatsappConsentQueryOptions = <TData = Awaited<ReturnType<typeof getWhatsappConsent>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWhatsappConsent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWhatsappConsentQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWhatsappConsent>>> = ({ signal }) => getWhatsappConsent({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWhatsappConsent>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWhatsappConsentQueryResult = NonNullable<Awaited<ReturnType<typeof getWhatsappConsent>>>
+export type GetWhatsappConsentQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Read WhatsApp consent for a patient
+ */
+
+export function useGetWhatsappConsent<TData = Awaited<ReturnType<typeof getWhatsappConsent>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWhatsappConsent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWhatsappConsentQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateWhatsappConsentUrl = () => {
+
+
+
+
+  return `/api/clinic/whatsapp/consent`
+}
+
+/**
+ * @summary Opt in or out of clinic WhatsApp messages
+ */
+export const updateWhatsappConsent = async (whatsappConsentInput: WhatsappConsentInput, options?: Parameters<typeof customFetch>[1]): Promise<UpdateWhatsappConsent200> => {
+
+  return customFetch<UpdateWhatsappConsent200>(getUpdateWhatsappConsentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(whatsappConsentInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateWhatsappConsentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWhatsappConsent>>, TError,{data: BodyType<WhatsappConsentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWhatsappConsent>>, TError,{data: BodyType<WhatsappConsentInput>}, TContext> => {
+
+const mutationKey = ['updateWhatsappConsent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWhatsappConsent>>, {data: BodyType<WhatsappConsentInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateWhatsappConsent(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWhatsappConsentMutationResult = NonNullable<Awaited<ReturnType<typeof updateWhatsappConsent>>>
+    export type UpdateWhatsappConsentMutationBody = BodyType<WhatsappConsentInput>
+    export type UpdateWhatsappConsentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Opt in or out of clinic WhatsApp messages
+ */
+export const useUpdateWhatsappConsent = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWhatsappConsent>>, TError,{data: BodyType<WhatsappConsentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateWhatsappConsent>>,
+        TError,
+        {data: BodyType<WhatsappConsentInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateWhatsappConsentMutationOptions(options));
+    }
+
+export const getListWhatsappOutboxUrl = () => {
+
+
+
+
+  return `/api/clinic/whatsapp/outbox`
+}
+
+/**
+ * @summary List WhatsApp delivery history
+ */
+export const listWhatsappOutbox = async ( options?: Parameters<typeof customFetch>[1]): Promise<ListWhatsappOutbox200Item[]> => {
+
+  return customFetch<ListWhatsappOutbox200Item[]>(getListWhatsappOutboxUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWhatsappOutboxQueryKey = () => {
+    return [
+    `/api/clinic/whatsapp/outbox`
+    ] as const;
+    }
+
+
+export const getListWhatsappOutboxQueryOptions = <TData = Awaited<ReturnType<typeof listWhatsappOutbox>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWhatsappOutbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWhatsappOutboxQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWhatsappOutbox>>> = ({ signal }) => listWhatsappOutbox({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWhatsappOutbox>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWhatsappOutboxQueryResult = NonNullable<Awaited<ReturnType<typeof listWhatsappOutbox>>>
+export type ListWhatsappOutboxQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List WhatsApp delivery history
+ */
+
+export function useListWhatsappOutbox<TData = Awaited<ReturnType<typeof listWhatsappOutbox>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWhatsappOutbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWhatsappOutboxQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getEnqueueWhatsappMessageUrl = () => {
+
+
+
+
+  return `/api/clinic/whatsapp/outbox`
+}
+
+/**
+ * @summary Queue a consented WhatsApp message
+ */
+export const enqueueWhatsappMessage = async (whatsappOutboxInput: WhatsappOutboxInput, options?: Parameters<typeof customFetch>[1]): Promise<EnqueueWhatsappMessage201> => {
+
+  return customFetch<EnqueueWhatsappMessage201>(getEnqueueWhatsappMessageUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(whatsappOutboxInput)
+  }
+);}
+
+
+
+
+
+export const getEnqueueWhatsappMessageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enqueueWhatsappMessage>>, TError,{data: BodyType<WhatsappOutboxInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof enqueueWhatsappMessage>>, TError,{data: BodyType<WhatsappOutboxInput>}, TContext> => {
+
+const mutationKey = ['enqueueWhatsappMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof enqueueWhatsappMessage>>, {data: BodyType<WhatsappOutboxInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  enqueueWhatsappMessage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EnqueueWhatsappMessageMutationResult = NonNullable<Awaited<ReturnType<typeof enqueueWhatsappMessage>>>
+    export type EnqueueWhatsappMessageMutationBody = BodyType<WhatsappOutboxInput>
+    export type EnqueueWhatsappMessageMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Queue a consented WhatsApp message
+ */
+export const useEnqueueWhatsappMessage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enqueueWhatsappMessage>>, TError,{data: BodyType<WhatsappOutboxInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof enqueueWhatsappMessage>>,
+        TError,
+        {data: BodyType<WhatsappOutboxInput>},
+        TContext
+      > => {
+      return useMutation(getEnqueueWhatsappMessageMutationOptions(options));
+    }
 
 export const getListClinicRecordsUrl = (table: 'appointments' | 'availability_slots' | 'clients' | 'package_templates' | 'patient_packages' | 'services' | 'session_exercises' | 'session_media' | 'session_plans' | 'user_roles',
     params?: ListClinicRecordsParams,) => {

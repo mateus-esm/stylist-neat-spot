@@ -6,13 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-/**
- * @nullable
- */
-export type ClinicSessionRole = typeof ClinicSessionRole[keyof typeof ClinicSessionRole] | null;
+export type ClinicContextRole = typeof ClinicContextRole[keyof typeof ClinicContextRole];
 
 
-export const ClinicSessionRole = {
+export const ClinicContextRole = {
   owner: 'owner',
   admin: 'admin',
   physiotherapist: 'physiotherapist',
