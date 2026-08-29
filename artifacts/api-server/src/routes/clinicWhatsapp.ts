@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import {
   db,
   clientsTable,
@@ -64,6 +64,7 @@ router.get("/clinic/whatsapp/consent", async (req: Request, res: Response) => {
   const [client] = await db.select().from(clientsTable).where(and(
     eq(clientsTable.id, clientId),
     context.role === "patient" ? eq(clientsTable.authUserId, userId) : eq(clientsTable.userId, userId),
+    or(eq(clientsTable.clinicId, context.clinicId), isNull(clientsTable.clinicId)),
   )).limit(1);
   if (!client) return res.status(404).json({ error: "Paciente não encontrado" });
   const [consent] = await db.select().from(whatsappConsentsTable).where(and(
@@ -129,6 +130,7 @@ router.post("/clinic/whatsapp/outbox", async (req: Request, res: Response) => {
   const { clientId, eventType, idempotencyKey, payload, fallbackText } = parsed.data;
   const [client] = await db.select().from(clientsTable).where(and(
     eq(clientsTable.id, clientId), eq(clientsTable.userId, admin.userId),
+    or(eq(clientsTable.clinicId, admin.clinicId), isNull(clientsTable.clinicId)),
   )).limit(1);
   if (!client) return res.status(404).json({ error: "Paciente não encontrado nesta clínica" });
   const [consent] = await db.select().from(whatsappConsentsTable).where(and(
@@ -155,13 +157,40 @@ async function processMessage(id: string, clinicId: string, logger: Request["log
     eq(whatsappOutboxTable.id, id), eq(whatsappOutboxTable.clinicId, clinicId),
   )).limit(1);
   if (!message) return null;
-  if (message.status === "sent") return message;
+  if (message.status === "sent" || message.status === "cancelled") return message;
   const attempt = Number(message.attempts) + 1;
+  const [client] = message.clientId
+    ? await db.select({ phone: clientsTable.phone }).from(clientsTable).where(and(
+      eq(clientsTable.id, message.clientId),
+      or(eq(clientsTable.clinicId, clinicId), isNull(clientsTable.clinicId)),
+    )).limit(1)
+    : [];
+  const [consent] = message.clientId
+    ? await db.select({ optedIn: whatsappConsentsTable.optedIn })
+      .from(whatsappConsentsTable)
+      .where(and(
+        eq(whatsappConsentsTable.clinicId, clinicId),
+        eq(whatsappConsentsTable.clientId, message.clientId),
+      )).limit(1)
+    : [];
+  if (!client || !consent?.optedIn || !(message.phone ?? client.phone)) {
+    const [cancelled] = await db.update(whatsappOutboxTable).set({
+      status: "cancelled",
+      lastError: "Paciente optou por não receber mensagens WhatsApp",
+    }).where(and(
+      eq(whatsappOutboxTable.id, id),
+      or(eq(whatsappOutboxTable.status, "pending"), eq(whatsappOutboxTable.status, "retry_wait")),
+    )).returning();
+    return cancelled ?? message;
+  }
   const baseUrl = process.env.WHATSMIAU_BASE_URL?.replace(/\/$/, "");
   if (!baseUrl) {
     const [fallback] = await db.update(whatsappOutboxTable).set({
       status: "fallback_required", attempts: String(attempt), lastError: "Whatsmiau não configurado",
-    }).where(and(eq(whatsappOutboxTable.id, id), eq(whatsappOutboxTable.status, "pending"))).returning();
+    }).where(and(
+      eq(whatsappOutboxTable.id, id),
+      or(eq(whatsappOutboxTable.status, "pending"), eq(whatsappOutboxTable.status, "retry_wait")),
+    )).returning();
     return fallback ?? message;
   }
   try {
@@ -174,7 +203,10 @@ async function processMessage(id: string, clinicId: string, logger: Request["log
     const body = await response.json().catch(() => ({})) as { id?: string; messageId?: string };
     const [sent] = await db.update(whatsappOutboxTable).set({
       status: "sent", attempts: String(attempt), providerMessageId: body.id ?? body.messageId ?? null, sentAt: new Date(), lastError: null,
-    }).where(and(eq(whatsappOutboxTable.id, id), eq(whatsappOutboxTable.status, "pending"))).returning();
+    }).where(and(
+      eq(whatsappOutboxTable.id, id),
+      or(eq(whatsappOutboxTable.status, "pending"), eq(whatsappOutboxTable.status, "retry_wait")),
+    )).returning();
     return sent ?? message;
   } catch (error) {
     logger.warn({ err: error, outboxId: id }, "WhatsApp delivery failed");
@@ -182,7 +214,10 @@ async function processMessage(id: string, clinicId: string, logger: Request["log
       status: attempt >= 3 ? "fallback_required" : "retry_wait",
       attempts: String(attempt), lastError: error instanceof Error ? error.message : "provider error",
       nextAttemptAt: new Date(Date.now() + Math.min(60, 2 ** attempt) * 60_000),
-    }).where(and(eq(whatsappOutboxTable.id, id), eq(whatsappOutboxTable.status, "pending"))).returning();
+    }).where(and(
+      eq(whatsappOutboxTable.id, id),
+      or(eq(whatsappOutboxTable.status, "pending"), eq(whatsappOutboxTable.status, "retry_wait")),
+    )).returning();
     return failed ?? message;
   }
 }

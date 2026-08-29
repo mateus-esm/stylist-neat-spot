@@ -21,7 +21,7 @@ import { Readable } from "stream";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, isNull } from "drizzle-orm";
 import {
   db,
   sessionMediaTable,
@@ -42,7 +42,7 @@ import {
   canAccessObject,
   ObjectPermission,
 } from "../lib/objectAcl";
-import { getStoredRole } from "./../lib/clinicRole";
+import { ensureClinicForUser, getStoredRole } from "./../lib/clinicRole";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -114,15 +114,23 @@ async function canReadMedia(
   const media = await findMediaRow(rawPath);
   if (!media) return false;
 
-  // Uploader always may read
-  if (media.uploadedBy === userId) return true;
+  const role = await getStoredRole(userId);
+  const context = await ensureClinicForUser(userId, role);
 
   const [appt] = await db
     .select()
     .from(appointmentsTable)
-    .where(eq(appointmentsTable.id, media.appointmentId))
+    .where(and(
+      eq(appointmentsTable.id, media.appointmentId),
+      context
+        ? or(eq(appointmentsTable.clinicId, context.clinicId), isNull(appointmentsTable.clinicId))
+        : undefined,
+    ))
     .limit(1);
   if (!appt) return false;
+
+  // Uploader may read only within their active clinic context.
+  if (media.uploadedBy === userId) return true;
 
   // Admin who owns the appointment
   if (appt.userId === userId) return true;
@@ -133,6 +141,7 @@ async function canReadMedia(
       eq(clinicAssignmentsTable.clientId, appt.clientId ?? ""),
       eq(clinicAssignmentsTable.physiotherapistUserId, userId),
       eq(clinicAssignmentsTable.status, "active"),
+      context ? eq(clinicAssignmentsTable.clinicId, context.clinicId) : undefined,
     )).limit(1);
   if (assigned) return true;
 
@@ -145,6 +154,9 @@ async function canReadMedia(
         and(
           eq(clientsTable.id, appt.clientId),
           eq(clientsTable.authUserId, userId),
+          context
+            ? or(eq(clientsTable.clinicId, context.clinicId), isNull(clientsTable.clinicId))
+            : undefined,
         ),
       )
       .limit(1);
@@ -165,15 +177,25 @@ async function canDeleteMedia(
   const media = await findMediaRow(rawPath);
   if (!media) return false;
 
+  const role = await getStoredRole(userId);
+  const context = await ensureClinicForUser(userId, role);
+
+  const [appt] = await db
+    .select()
+    .from(appointmentsTable)
+    .where(and(
+      eq(appointmentsTable.id, media.appointmentId),
+      context
+        ? or(eq(appointmentsTable.clinicId, context.clinicId), isNull(appointmentsTable.clinicId))
+        : undefined,
+    ))
+    .limit(1);
+  if (!appt) return false;
+
   // Uploader (admin or patient) may always delete their own upload
   if (media.uploadedBy === userId) return true;
 
   // Admin who owns the appointment may delete any media on it
-  const [appt] = await db
-    .select({ userId: appointmentsTable.userId })
-    .from(appointmentsTable)
-    .where(eq(appointmentsTable.id, media.appointmentId))
-    .limit(1);
   if (appt && appt.userId === userId) return true;
 
   const [assigned] = await db.select({ id: clinicAssignmentsTable.id })
@@ -182,6 +204,7 @@ async function canDeleteMedia(
       eq(clinicAssignmentsTable.clientId, (await db.select({ clientId: appointmentsTable.clientId }).from(appointmentsTable).where(eq(appointmentsTable.id, media.appointmentId)).limit(1))[0]?.clientId ?? ""),
       eq(clinicAssignmentsTable.physiotherapistUserId, userId),
       eq(clinicAssignmentsTable.status, "active"),
+      context ? eq(clinicAssignmentsTable.clinicId, context.clinicId) : undefined,
     )).limit(1);
   if (assigned) return true;
 

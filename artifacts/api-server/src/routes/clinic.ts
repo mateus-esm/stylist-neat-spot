@@ -19,7 +19,7 @@
  */
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
-import { eq, ne, ilike, gte, lte, and, inArray, asc, desc, isNull, getTableColumns } from "drizzle-orm";
+import { eq, ne, ilike, gte, lte, and, or, inArray, asc, desc, isNull, getTableColumns } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import {
   db,
@@ -49,6 +49,7 @@ import {
 import { requireClinicAuth } from "../middlewares/requireClinicAuth";
 import {
   resolveOrBootstrapRole,
+  ensureClinicForUser,
   tryLinkPatientInvite,
   getClientIdForPatient,
   isAdminRole,
@@ -179,6 +180,18 @@ function resultToSnake(
     return rowToSnake(result as Record<string, unknown>, table);
   }
   return result;
+}
+
+/** Keep nullable legacy tenant columns compatible without crossing clinics. */
+function scopedToClinic(
+  table: any,
+  baseWhere: SQL | undefined,
+  clinicId: string,
+): SQL | undefined {
+  const clinicColumn = table["clinicId"];
+  if (!clinicColumn) return baseWhere;
+  const tenantWhere = or(eq(clinicColumn, clinicId), isNull(clinicColumn));
+  return baseWhere ? and(baseWhere, tenantWhere) : tenantWhere;
 }
 
 // ---------------------------------------------------------------------------
@@ -409,6 +422,11 @@ router.get(
       res.status(403).json({ error: "Fisioterapeutas e pacientes devem usar operações clínicas controladas" });
       return;
     }
+    const context = await ensureClinicForUser(userId, role);
+    if (!context) {
+      res.status(403).json({ error: "No clinic membership" });
+      return;
+    }
 
     // Parse query modifiers
     const rawFilters = Array.isArray(req.query.filters)
@@ -458,7 +476,10 @@ router.get(
         const apptRows = await db
           .select({ id: appointmentsTable.id })
           .from(appointmentsTable)
-          .where(eq(appointmentsTable.userId, userId));
+          .where(and(
+            eq(appointmentsTable.userId, userId),
+            or(eq(appointmentsTable.clinicId, context.clinicId), isNull(appointmentsTable.clinicId)),
+          ));
         const apptIds = apptRows.map((a) => a.id);
         if (apptIds.length === 0) {
           res.json(single ? null : []);
@@ -476,6 +497,7 @@ router.get(
       if (entry.ownerColumn && drizzleTable["userId"]) {
         authWhere = eq(drizzleTable["userId"], userId);
       }
+      authWhere = scopedToClinic(drizzleTable, authWhere, context.clinicId);
       const combinedWhere =
         authWhere && callerWhere
           ? and(authWhere, callerWhere)
@@ -671,11 +693,15 @@ router.get(
 async function verifyClientOwnership(
   clientId: string,
   adminUserId: string,
+  clinicId?: string,
 ): Promise<boolean> {
+  const clinicScope = clinicId
+    ? or(eq(clientsTable.clinicId, clinicId), isNull(clientsTable.clinicId))
+    : undefined;
   const [row] = await db
     .select({ id: clientsTable.id })
     .from(clientsTable)
-    .where(and(eq(clientsTable.id, clientId), eq(clientsTable.userId, adminUserId)))
+    .where(and(eq(clientsTable.id, clientId), eq(clientsTable.userId, adminUserId), clinicScope))
     .limit(1);
   return !!row;
 }
@@ -684,7 +710,11 @@ async function verifyClientOwnership(
 async function verifyAppointmentOwnership(
   appointmentId: string,
   adminUserId: string,
+  clinicId?: string,
 ): Promise<boolean> {
+  const clinicScope = clinicId
+    ? or(eq(appointmentsTable.clinicId, clinicId), isNull(appointmentsTable.clinicId))
+    : undefined;
   const [row] = await db
     .select({ id: appointmentsTable.id })
     .from(appointmentsTable)
@@ -692,6 +722,7 @@ async function verifyAppointmentOwnership(
       and(
         eq(appointmentsTable.id, appointmentId),
         eq(appointmentsTable.userId, adminUserId),
+        clinicScope,
       ),
     )
     .limit(1);
@@ -709,6 +740,7 @@ async function sanitiseAdminRecord(
   tableName: TableSlug,
   entry: { ownerColumn: string | null; table: unknown },
   userId: string,
+  clinicId: string,
 ): Promise<{ ok: true; body: Record<string, unknown> } | { ok: false; status: number; error: string }> {
   // Convert input (snake_case or camelCase) to Drizzle camelCase property names
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -718,6 +750,9 @@ async function sanitiseAdminRecord(
   if (entry.ownerColumn) {
     body["userId"] = userId;
   }
+  if ((entry.table as any)["clinicId"]) {
+    body["clinicId"] = clinicId;
+  }
   if (tableName === "session_media") {
     body["uploadedBy"] = userId;
   }
@@ -726,29 +761,29 @@ async function sanitiseAdminRecord(
 
   // FK ownership checks — read from camelCase body keys
   if (tableName === "appointments" && body["clientId"]) {
-    if (!await verifyClientOwnership(body["clientId"] as string, userId))
+    if (!await verifyClientOwnership(body["clientId"] as string, userId, clinicId))
       return { ok: false, status: 403, error: "client_id does not belong to you" };
   }
 
   if ((tableName === "session_media" || tableName === "session_exercises") && body["appointmentId"]) {
-    if (!await verifyAppointmentOwnership(body["appointmentId"] as string, userId))
+    if (!await verifyAppointmentOwnership(body["appointmentId"] as string, userId, clinicId))
       return { ok: false, status: 403, error: "appointment_id does not belong to you" };
   }
 
   if (tableName === "patient_packages" && body["clientId"]) {
-    if (!await verifyClientOwnership(body["clientId"] as string, userId))
+    if (!await verifyClientOwnership(body["clientId"] as string, userId, clinicId))
       return { ok: false, status: 403, error: "client_id does not belong to you" };
   }
 
   if (tableName === "session_plans") {
-    if (body["clientId"] && !await verifyClientOwnership(body["clientId"] as string, userId))
+    if (body["clientId"] && !await verifyClientOwnership(body["clientId"] as string, userId, clinicId))
       return { ok: false, status: 403, error: "client_id does not belong to you" };
-    if (body["appointmentId"] && !await verifyAppointmentOwnership(body["appointmentId"] as string, userId))
+    if (body["appointmentId"] && !await verifyAppointmentOwnership(body["appointmentId"] as string, userId, clinicId))
       return { ok: false, status: 403, error: "appointment_id does not belong to you" };
   }
 
   if (tableName === "availability_slots" && body["appointmentId"]) {
-    if (!await verifyAppointmentOwnership(body["appointmentId"] as string, userId))
+    if (!await verifyAppointmentOwnership(body["appointmentId"] as string, userId, clinicId))
       return { ok: false, status: 403, error: "appointment_id does not belong to you" };
   }
 
@@ -827,6 +862,11 @@ router.post(
       res.status(403).json({ error: "No role assigned" });
       return;
     }
+    const context = await ensureClinicForUser(userId, role);
+    if (!context) {
+      res.status(403).json({ error: "No clinic membership" });
+      return;
+    }
 
     // Patients may never bulk-insert
     if (role === "patient" && isBulk) {
@@ -870,7 +910,7 @@ router.post(
     // Sanitise all records first (fail fast on any FK violation before any DB write)
     const sanitisedBodies: Record<string, unknown>[] = [];
     for (const ri of rawInputs) {
-      const result = await sanitiseAdminRecord(ri, tableName, entry, userId);
+      const result = await sanitiseAdminRecord(ri, tableName, entry, userId, context.clinicId);
       if (!result.ok) {
         res.status(result.status).json({ error: result.error });
         return;
@@ -931,6 +971,11 @@ router.patch(
     const role = await resolveOrBootstrapRole(userId);
     if (!role) {
       res.status(403).json({ error: "No role assigned" });
+      return;
+    }
+    const context = await ensureClinicForUser(userId, role);
+    if (!context) {
+      res.status(403).json({ error: "No clinic membership" });
       return;
     }
 
@@ -1114,6 +1159,33 @@ router.patch(
     const body = bodyToDb(rawInput, drizzleTable);
     delete body["id"];
 
+    // Ownership and tenant are immutable through the compatibility API.
+    // Cross-clinic transfers must use the audited team transfer operation.
+    if (Object.prototype.hasOwnProperty.call(body, "userId") && body["userId"] !== userId) {
+      res.status(403).json({ error: "user_id cannot be changed through the generic API" });
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "clinicId") && body["clinicId"] !== context.clinicId) {
+      res.status(403).json({ error: "clinic_id cannot be changed through the generic API" });
+      return;
+    }
+    if (entry.ownerColumn && drizzleTable["userId"]) body["userId"] = userId;
+    if (drizzleTable["clinicId"]) body["clinicId"] = context.clinicId;
+    if (Object.prototype.hasOwnProperty.call(body, "assignedToUserId") && body["assignedToUserId"]) {
+      const [member] = await db.select({ id: clinicAssignmentsTable.id })
+        .from(clinicAssignmentsTable)
+        .where(and(
+          eq(clinicAssignmentsTable.physiotherapistUserId, body["assignedToUserId"] as string),
+          eq(clinicAssignmentsTable.clinicId, context.clinicId),
+          eq(clinicAssignmentsTable.status, "active"),
+        ))
+        .limit(1);
+      if (!member) {
+        res.status(403).json({ error: "assigned_to_user_id is not active in this clinic" });
+        return;
+      }
+    }
+
     // -----------------------------------------------------------------------
     // session_media generic PATCH — caption-only metadata allowlist.
     //
@@ -1171,7 +1243,7 @@ router.patch(
 
     // FK checks for fields being changed — read camelCase keys from body
     if (tableName === "appointments" && body["clientId"]) {
-      const ok = await verifyClientOwnership(body["clientId"] as string, userId);
+      const ok = await verifyClientOwnership(body["clientId"] as string, userId, context.clinicId);
       if (!ok) {
         res.status(403).json({ error: "client_id does not belong to you" });
         return;
@@ -1184,6 +1256,7 @@ router.patch(
       const ok = await verifyAppointmentOwnership(
         body["appointmentId"] as string,
         userId,
+        context.clinicId,
       );
       if (!ok) {
         res.status(403).json({ error: "appointment_id does not belong to you" });
@@ -1192,7 +1265,7 @@ router.patch(
     }
 
     if (tableName === "patient_packages" && body["clientId"]) {
-      const ok = await verifyClientOwnership(body["clientId"] as string, userId);
+      const ok = await verifyClientOwnership(body["clientId"] as string, userId, context.clinicId);
       if (!ok) {
         res.status(403).json({ error: "client_id does not belong to you" });
         return;
@@ -1201,7 +1274,7 @@ router.patch(
 
     if (tableName === "session_plans") {
       if (body["clientId"]) {
-        const ok = await verifyClientOwnership(body["clientId"] as string, userId);
+        const ok = await verifyClientOwnership(body["clientId"] as string, userId, context.clinicId);
         if (!ok) {
           res.status(403).json({ error: "client_id does not belong to you" });
           return;
@@ -1211,6 +1284,7 @@ router.patch(
         const ok = await verifyAppointmentOwnership(
           body["appointmentId"] as string,
           userId,
+          context.clinicId,
         );
         if (!ok) {
           res.status(403).json({ error: "appointment_id does not belong to you" });
@@ -1296,6 +1370,11 @@ router.delete(
       res.status(403).json({ error: "Forbidden" });
       return;
     }
+    const context = await ensureClinicForUser(userId, role);
+    if (!context) {
+      res.status(403).json({ error: "No clinic membership" });
+      return;
+    }
 
     const entry = CLINIC_TABLE_REGISTRY[tableName as TableSlug];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1305,11 +1384,15 @@ router.delete(
     if (entry.ownerColumn && drizzleTable["userId"]) {
       whereClause = and(whereClause, eq(drizzleTable["userId"], userId))!;
     }
+    whereClause = scopedToClinic(drizzleTable, whereClause, context.clinicId)!;
     if (tableName === "session_exercises" || tableName === "session_media") {
       const apptRows = await db
         .select({ id: appointmentsTable.id })
         .from(appointmentsTable)
-        .where(eq(appointmentsTable.userId, userId));
+        .where(and(
+          eq(appointmentsTable.userId, userId),
+          or(eq(appointmentsTable.clinicId, context.clinicId), isNull(appointmentsTable.clinicId)),
+        ));
       const apptIds = apptRows.map((a) => a.id);
       if (apptIds.length === 0) {
         res.status(404).json({ error: "Record not found" });
@@ -1671,6 +1754,7 @@ async function authorizeAppointmentForMedia(
   role: string,
   userId: string,
   patientClientId: string | null,
+  clinicId?: string,
 ): Promise<MediaAuthResult> {
   const [appt] = await exec
     .select({
@@ -1679,7 +1763,12 @@ async function authorizeAppointmentForMedia(
       clientId: appointmentsTable.clientId,
     })
     .from(appointmentsTable)
-    .where(eq(appointmentsTable.id, appointmentId))
+    .where(and(
+      eq(appointmentsTable.id, appointmentId),
+      clinicId
+        ? or(eq(appointmentsTable.clinicId, clinicId), isNull(appointmentsTable.clinicId))
+        : undefined,
+    ))
     .limit(1);
   if (!appt) {
     return { ok: false, status: 404, error: "Appointment not found" };
@@ -1698,6 +1787,7 @@ async function authorizeAppointmentForMedia(
           eq(clinicAssignmentsTable.clientId, appt.clientId),
           eq(clinicAssignmentsTable.physiotherapistUserId, userId),
           eq(clinicAssignmentsTable.status, "active"),
+          clinicId ? eq(clinicAssignmentsTable.clinicId, clinicId) : undefined,
         )).limit(1)
       : [];
     if (assignment) return { ok: true };
@@ -1722,6 +1812,11 @@ router.post(
     const role = await resolveOrBootstrapRole(userId);
     if (!role) {
       res.status(403).json({ error: "No role assigned" });
+      return;
+    }
+    const context = await ensureClinicForUser(userId, role);
+    if (!context) {
+      res.status(403).json({ error: "No clinic membership" });
       return;
     }
 
@@ -1776,6 +1871,7 @@ router.post(
       role,
       userId,
       patientClientId,
+      context.clinicId,
     );
     if (!preAuth.ok) {
       res.status(preAuth.status).json({ error: preAuth.error });
@@ -1868,6 +1964,7 @@ router.post(
           role,
           userId,
           patientClientId,
+          context.clinicId,
         );
         if (!auth.ok) {
           throw new MediaFinalizeError(auth.status, auth.error);

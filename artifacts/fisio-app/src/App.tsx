@@ -20,6 +20,7 @@ import PatientPortal from "./pages/PatientPortal";
 import PatientSession from "./pages/PatientSession";
 import AcceptInvite from "./pages/AcceptInvite";
 import BottomNav from "./components/BottomNav";
+import { signInRedirectUrl } from "./lib/authRedirect";
 
 import { ClerkProvider } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
@@ -36,7 +37,7 @@ const ProtectedRoute = ({ children, allow }: { children: React.ReactNode; allow?
   const { role, loading: roleLoading } = useRole();
   const location = useLocation();
   if (loading || roleLoading) return <div className="flex min-h-screen items-center justify-center">Carregando...</div>;
-  if (!user) return <Navigate to={`/sign-in?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+  if (!user) return <Navigate to={signInRedirectUrl(location.pathname, location.search, location.hash)} replace />;
   if (!role) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6 text-center">

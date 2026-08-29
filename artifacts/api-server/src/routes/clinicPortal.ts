@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import {
   db,
   appointmentsTable,
@@ -44,7 +44,10 @@ async function accessibleAppointment(userId: string, appointmentId: string) {
   const context = await contextFor(userId);
   if (!context) return { context: null, appointment: null };
   const [appointment] = await db.select().from(appointmentsTable)
-    .where(eq(appointmentsTable.id, appointmentId)).limit(1);
+    .where(and(
+      eq(appointmentsTable.id, appointmentId),
+      or(eq(appointmentsTable.clinicId, context.clinicId), isNull(appointmentsTable.clinicId)),
+    )).limit(1);
   if (!appointment) return { context, appointment: null };
 
   if (context.role === "patient") {
@@ -85,11 +88,12 @@ router.get("/clinic/portal", async (req: Request, res: Response) => {
     clientIds = assignments.map((row) => row.clientId);
   }
 
+  const clinicAppointmentScope = or(eq(appointmentsTable.clinicId, context.clinicId), isNull(appointmentsTable.clinicId));
   const appointmentWhere = clientIds.length
-    ? inArray(appointmentsTable.clientId, clientIds)
+    ? and(inArray(appointmentsTable.clientId, clientIds), clinicAppointmentScope)
     : isAdminRole(context.role)
-      ? eq(appointmentsTable.userId, userId)
-      : eq(appointmentsTable.assignedToUserId, userId);
+      ? and(eq(appointmentsTable.userId, userId), clinicAppointmentScope)
+      : and(eq(appointmentsTable.assignedToUserId, userId), clinicAppointmentScope);
   const appointments = await db.select().from(appointmentsTable).where(appointmentWhere).orderBy(
     asc(appointmentsTable.appointmentDate), asc(appointmentsTable.appointmentTime),
   );
