@@ -122,20 +122,21 @@ export async function getWhatsappConfig(clinicId: string) {
   if (!settings) {
     [settings] = await db.insert(whatsappSettingsTable).values({ clinicId }).returning();
   }
+  const instanceName = settings.instanceName ?? process.env.WHATSMIAU_INSTANCE_NAME ?? null;
   return {
     settings,
     provider: {
-      configured: Boolean(process.env.WHATSMIAU_API_TOKEN && process.env.WHATSMIAU_INSTANCE_NAME),
+      configured: Boolean(process.env.WHATSMIAU_API_TOKEN && instanceName),
       baseUrlConfigured: Boolean(process.env.WHATSMIAU_BASE_URL),
       tokenConfigured: Boolean(process.env.WHATSMIAU_API_TOKEN),
-      instanceConfigured: Boolean(process.env.WHATSMIAU_INSTANCE_NAME),
-      instanceName: process.env.WHATSMIAU_INSTANCE_NAME || null,
+      instanceConfigured: Boolean(instanceName),
+      instanceName,
       baseUrl: process.env.WHATSMIAU_BASE_URL || WHATSMIAU_DEFAULT_BASE_URL,
       sendPath: process.env.WHATSMIAU_SEND_PATH || WHATSMIAU_DEFAULT_SEND_PATH,
       authHeader: "apikey",
       supportedMessageTypes: ["text", "buttons", "list"],
       asyncEnabled: isWhatsappAsyncEnabled(),
-      status: process.env.WHATSMIAU_API_TOKEN && process.env.WHATSMIAU_INSTANCE_NAME ? "configured" : "not_configured",
+      status: settings.connectionStatus,
     },
   };
 }
@@ -325,10 +326,10 @@ export async function enqueueDueWhatsappReminders(now = new Date()) {
   return queued;
 }
 
-function providerConfig() {
+function providerConfig(instanceNameOverride?: string | null) {
   const baseUrl = (process.env.WHATSMIAU_BASE_URL || WHATSMIAU_DEFAULT_BASE_URL).replace(/\/$/, "");
   const token = process.env.WHATSMIAU_API_TOKEN;
-  const instanceName = process.env.WHATSMIAU_INSTANCE_NAME?.trim();
+  const instanceName = (instanceNameOverride ?? process.env.WHATSMIAU_INSTANCE_NAME)?.trim();
   if (!token || !instanceName) {
     throw new WhatsappConfigurationError("Whatsmiau não configurado: defina WHATSMIAU_API_TOKEN e WHATSMIAU_INSTANCE_NAME");
   }
@@ -344,10 +345,10 @@ function providerConfig() {
   };
 }
 
-type WhatsappProviderMessage = Pick<typeof whatsappOutboxTable.$inferSelect, "phone" | "fallbackText" | "idempotencyKey">;
+type WhatsappProviderMessage = Pick<typeof whatsappOutboxTable.$inferSelect, "clinicId" | "phone" | "fallbackText" | "idempotencyKey">;
 
-export function buildWhatsmiauRequest(message: WhatsappProviderMessage) {
-  const config = providerConfig();
+export function buildWhatsmiauRequest(message: WhatsappProviderMessage, instanceName?: string | null) {
+  const config = providerConfig(instanceName);
   if (!message.phone) {
     throw new Error("Mensagem WhatsApp sem telefone");
   }
@@ -385,7 +386,11 @@ export function extractWhatsmiauMessageId(body: unknown) {
 }
 
 async function sendToWhatsmiau(message: WhatsappProviderMessage) {
-  const request = buildWhatsmiauRequest(message);
+  const [settings] = await db.select({ instanceName: whatsappSettingsTable.instanceName })
+    .from(whatsappSettingsTable)
+    .where(eq(whatsappSettingsTable.clinicId, message.clinicId))
+    .limit(1);
+  const request = buildWhatsmiauRequest(message, settings?.instanceName);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), request.timeout);
   try {
@@ -403,6 +408,148 @@ async function sendToWhatsmiau(message: WhatsappProviderMessage) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+type WhatsmiauInstanceConnection = {
+  instanceName: string;
+  status: string;
+  phoneNumber: string | null;
+  qrCode: string | null;
+  qrExpiresAt: string | null;
+};
+
+function managementPath(envName: string, fallback: string) {
+  return (process.env[envName] || fallback).trim();
+}
+
+function instanceUrl(baseUrl: string, path: string, instanceName: string) {
+  const encodedInstance = encodeURIComponent(instanceName);
+  return `${baseUrl}${path.replace(":instance", encodedInstance).replace("{instance}", encodedInstance)}`;
+}
+
+function extractQrCode(body: unknown): string | null {
+  const candidates = [
+    stringAt(body, "base64"),
+    stringAt(body, "qrcode", "base64"),
+    stringAt(body, "qr", "base64"),
+    stringAt(body, "data", "base64"),
+    stringAt(body, "data", "qrcode", "base64"),
+    stringAt(body, "data", "qr", "base64"),
+  ];
+  return candidates.find((value) => value?.startsWith("data:image") || value?.length) ?? null;
+}
+
+function extractInstanceStatus(body: unknown) {
+  const status = stringAt(body, "instance", "state")
+    ?? stringAt(body, "state")
+    ?? stringAt(body, "status")
+    ?? stringAt(body, "data", "instance", "state")
+    ?? stringAt(body, "data", "state")
+    ?? "unknown";
+  const normalized = status.toLowerCase();
+  if (normalized === "open" || normalized === "connected") return "connected";
+  if (normalized === "connecting" || normalized === "qr") return "awaiting_qr";
+  if (normalized === "close" || normalized === "closed" || normalized === "disconnected") return "disconnected";
+  return normalized;
+}
+
+function extractPhoneNumber(body: unknown): string | null {
+  return stringAt(body, "instance", "owner")
+    ?? stringAt(body, "owner")
+    ?? stringAt(body, "data", "instance", "owner")
+    ?? stringAt(body, "data", "owner");
+}
+
+function managementConfig() {
+  const baseUrl = (process.env.WHATSMIAU_BASE_URL || WHATSMIAU_DEFAULT_BASE_URL).replace(/\/$/, "");
+  const token = process.env.WHATSMIAU_API_TOKEN;
+  if (!token) {
+    throw new WhatsappConfigurationError("Whatsmiau não configurado: defina WHATSMIAU_API_TOKEN");
+  }
+  return {
+    baseUrl,
+    token,
+    timeout: Math.max(Number(process.env.WHATSMIAU_TIMEOUT_MS || 10000), 1000),
+  };
+}
+
+async function managementRequest(
+  method: "GET" | "POST" | "DELETE",
+  url: string,
+  body?: Record<string, unknown>,
+) {
+  const config = managementConfig();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeout);
+  try {
+    const response = await fetch(url, {
+      method,
+      signal: controller.signal,
+      headers: {
+        "content-type": "application/json",
+        apikey: config.token,
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    const responseBody = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(`Whatsmiau HTTP ${response.status}`);
+    }
+    return responseBody;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function createWhatsmiauInstance(instanceName: string): Promise<WhatsmiauInstanceConnection> {
+  const config = managementConfig();
+  const createPath = managementPath("WHATSMIAU_CREATE_INSTANCE_PATH", "/instance/create");
+  const createUrl = `${config.baseUrl}${createPath}`;
+  try {
+    await managementRequest("POST", createUrl, {
+      instanceName,
+      token: randomUUID(),
+      qrcode: true,
+      integration: "WHATSAPP-BAILEYS",
+    });
+  } catch (error) {
+    if (!(error instanceof Error && error.message.includes("HTTP 409"))) throw error;
+  }
+  return connectWhatsmiauInstance(instanceName);
+}
+
+export async function connectWhatsmiauInstance(instanceName: string): Promise<WhatsmiauInstanceConnection> {
+  const config = managementConfig();
+  const connectPath = managementPath("WHATSMIAU_CONNECT_INSTANCE_PATH", "/instance/connect/:instance");
+  const body = await managementRequest("GET", instanceUrl(config.baseUrl, connectPath, instanceName));
+  const qrCode = extractQrCode(body);
+  return {
+    instanceName,
+    status: qrCode ? "awaiting_qr" : extractInstanceStatus(body),
+    phoneNumber: extractPhoneNumber(body),
+    qrCode,
+    qrExpiresAt: qrCode ? new Date(Date.now() + 120_000).toISOString() : null,
+  };
+}
+
+export async function getWhatsmiauInstanceStatus(instanceName: string): Promise<WhatsmiauInstanceConnection> {
+  const config = managementConfig();
+  const statusPath = managementPath("WHATSMIAU_STATUS_INSTANCE_PATH", "/instance/connectionState/:instance");
+  const body = await managementRequest("GET", instanceUrl(config.baseUrl, statusPath, instanceName));
+  return {
+    instanceName,
+    status: extractInstanceStatus(body),
+    phoneNumber: extractPhoneNumber(body),
+    qrCode: null,
+    qrExpiresAt: null,
+  };
+}
+
+export async function disconnectWhatsmiauInstance(instanceName: string) {
+  const config = managementConfig();
+  const logoutPath = managementPath("WHATSMIAU_LOGOUT_INSTANCE_PATH", "/instance/logout/:instance");
+  await managementRequest("DELETE", instanceUrl(config.baseUrl, logoutPath, instanceName));
+  return { instanceName, status: "disconnected" };
 }
 
 type WhatsmiauDelivery = {
