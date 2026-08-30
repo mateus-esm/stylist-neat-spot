@@ -48,12 +48,14 @@ import type {
   PatientPortal,
   PerformPortalAppointmentAction200,
   PortalAppointmentActionInput,
+  ReceiveWhatsmiauWebhookParams,
   TransferClinicAppointment200,
   TransferClinicAppointmentBody,
   UpdateWhatsappConsent200,
   WhatsappConfig,
   WhatsappConfigUpdate,
   WhatsappConsentInput,
+  WhatsappDeliveryEvent,
   WhatsappOutbox,
   WhatsappOutboxInput,
   WhatsappSettings,
@@ -62,7 +64,9 @@ import type {
   WhatsappTemplatePreview,
   WhatsappTemplatePreviewInput,
   WhatsappTemplateTestInput,
-  WhatsappTemplateUpdate
+  WhatsappTemplateUpdate,
+  WhatsmiauWebhook,
+  WhatsmiauWebhookAck
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -99,7 +103,6 @@ export const getHealthCheckUrl = () => {
 
   return `/api/healthz`
 }
-
 /**
  * Returns server health status
  * @summary Health check
@@ -163,12 +166,6 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
-
-
-
-
-
 
 export const getGetClinicSessionUrl = () => {
 
@@ -242,11 +239,6 @@ export function useGetClinicSession<TData = Awaited<ReturnType<typeof getClinicS
 }
 
 
-
-
-
-
-
 export const getGetClinicContextUrl = () => {
 
 
@@ -317,13 +309,6 @@ export function useGetClinicContext<TData = Awaited<ReturnType<typeof getClinicC
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
-
-
-
-
-
-
 export const getListClinicMembersUrl = () => {
 
 
@@ -2611,3 +2596,153 @@ export const useFinalizeAppointmentMedia = <TError = ErrorType<void>,
       return useMutation(getFinalizeAppointmentMediaMutationOptions(options));
     }
 
+export const getReceiveWhatsmiauWebhookUrl = (params?: ReceiveWhatsmiauWebhookParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/webhooks/whatsmiau?${stringifiedParams}` : `/api/webhooks/whatsmiau`
+}
+
+/**
+ * Receives the provider's messages.update callback. Only delivery metadata is retained; message content and chat identifiers are deliberately ignored. If WHATSMIAU_WEBHOOK_TOKEN is configured, the callback must include that token as the token query parameter or x-whatsmiau-webhook-token header.
+ * @summary Receive WhatsMiau delivery status callbacks
+ */
+export const receiveWhatsmiauWebhook = async (whatsmiauWebhook: WhatsmiauWebhook,
+    params?: ReceiveWhatsmiauWebhookParams, options?: Parameters<typeof customFetch>[1]): Promise<WhatsmiauWebhookAck> => {
+
+  return customFetch<WhatsmiauWebhookAck>(getReceiveWhatsmiauWebhookUrl(params),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(whatsmiauWebhook)
+  }
+);}
+
+
+
+
+
+export const getReceiveWhatsmiauWebhookMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveWhatsmiauWebhook>>, TError,{data: BodyType<WhatsmiauWebhook>;params?: ReceiveWhatsmiauWebhookParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof receiveWhatsmiauWebhook>>, TError,{data: BodyType<WhatsmiauWebhook>;params?: ReceiveWhatsmiauWebhookParams}, TContext> => {
+
+const mutationKey = ['receiveWhatsmiauWebhook'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof receiveWhatsmiauWebhook>>, {data: BodyType<WhatsmiauWebhook>;params?: ReceiveWhatsmiauWebhookParams}> = (props) => {
+          const {data,params} = props ?? {};
+
+          return  receiveWhatsmiauWebhook(data,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReceiveWhatsmiauWebhookMutationResult = NonNullable<Awaited<ReturnType<typeof receiveWhatsmiauWebhook>>>
+    export type ReceiveWhatsmiauWebhookMutationBody = BodyType<WhatsmiauWebhook>
+    export type ReceiveWhatsmiauWebhookMutationError = ErrorType<void>
+
+    /**
+ * @summary Receive WhatsMiau delivery status callbacks
+ */
+export const useReceiveWhatsmiauWebhook = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receiveWhatsmiauWebhook>>, TError,{data: BodyType<WhatsmiauWebhook>;params?: ReceiveWhatsmiauWebhookParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof receiveWhatsmiauWebhook>>,
+        TError,
+        {data: BodyType<WhatsmiauWebhook>;params?: ReceiveWhatsmiauWebhookParams},
+        TContext
+      > => {
+      return useMutation(getReceiveWhatsmiauWebhookMutationOptions(options));
+    }
+
+export const getListWhatsappDeliveryEventsUrl = (id: string,) => {
+
+
+
+
+  return `/api/clinic/whatsapp/outbox/${id}/events`
+}
+
+/**
+ * @summary List idempotent delivery status events for an outbox item
+ */
+export const listWhatsappDeliveryEvents = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<WhatsappDeliveryEvent[]> => {
+
+  return customFetch<WhatsappDeliveryEvent[]>(getListWhatsappDeliveryEventsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWhatsappDeliveryEventsQueryKey = (id: string,) => {
+    return [
+    `/api/clinic/whatsapp/outbox/${id}/events`
+    ] as const;
+    }
+
+
+export const getListWhatsappDeliveryEventsQueryOptions = <TData = Awaited<ReturnType<typeof listWhatsappDeliveryEvents>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWhatsappDeliveryEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWhatsappDeliveryEventsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWhatsappDeliveryEvents>>> = ({ signal }) => listWhatsappDeliveryEvents(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWhatsappDeliveryEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWhatsappDeliveryEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listWhatsappDeliveryEvents>>>
+export type ListWhatsappDeliveryEventsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List idempotent delivery status events for an outbox item
+ */
+
+export function useListWhatsappDeliveryEvents<TData = Awaited<ReturnType<typeof listWhatsappDeliveryEvents>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWhatsappDeliveryEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWhatsappDeliveryEventsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}

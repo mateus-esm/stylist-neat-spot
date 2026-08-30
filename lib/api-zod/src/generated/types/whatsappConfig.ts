@@ -5,5 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { WhatsappConfigProvider } from './whatsappConfigProvider';
+import type { WhatsappSettings } from './whatsappSettings';
 
-export interface WhatsappConfig { [key: string]: unknown }
+export interface WhatsappConfig {
+  settings: WhatsappSettings;
+  provider: WhatsappConfigProvider;
+}

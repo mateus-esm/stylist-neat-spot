@@ -4,7 +4,8 @@ export * from "./generated/api";
 // Re-export the generated TypeScript types. `ListClinicRecordsParams` is
 // intentionally omitted here because it collides with the zod schema of the
 // same name exported from "./generated/api" (which is the one consumers use).
-// All other generated types are safe to re-export directly.
+// Keep this list explicit: generated schemas and TypeScript declarations can
+// collide as the OpenAPI spec grows.
 export type {
   AppointmentMediaInput,
   ClinicBooking,

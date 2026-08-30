@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: webhooks
+    description: Provider callbacks
 paths:
   /healthz:
     get:
@@ -605,6 +607,60 @@ paths:
           description: Pending upload already finalized
         "410":
           description: Pending upload expired
+  /webhooks/whatsmiau:
+    post:
+      operationId: receiveWhatsmiauWebhook
+      tags: [webhooks]
+      summary: Receive WhatsMiau delivery status callbacks
+      description: >
+        Receives the provider's messages.update callback. Only delivery
+        metadata is retained; message content and chat identifiers are
+        deliberately ignored. If WHATSMIAU_WEBHOOK_TOKEN is configured, the
+        callback must include that token as the token query parameter or
+        x-whatsmiau-webhook-token header.
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema: { type: string }
+          description: Optional shared webhook token configured by the server.
+        - name: x-whatsmiau-webhook-token
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatsmiauWebhook"
+      responses:
+        "200":
+          description: Callback accepted and processed idempotently
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsmiauWebhookAck"
+        "400":
+          description: Unsupported or malformed callback
+        "401":
+          description: Invalid configured webhook token
+  /clinic/whatsapp/outbox/{id}/events:
+    get:
+      operationId: listWhatsappDeliveryEvents
+      tags: [clinic]
+      summary: List idempotent delivery status events for an outbox item
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      responses:
+        "200":
+          description: Delivery status events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WhatsappDeliveryEvent"
 components:
   parameters:
     ClinicTable:
@@ -705,7 +761,27 @@ components:
         templateKey: { type: string }
     WhatsappConfig:
       type: object
-      additionalProperties: true
+      required: [settings, provider]
+      properties:
+        settings:
+          $ref: "#/components/schemas/WhatsappSettings"
+        provider:
+          type: object
+          required: [configured, baseUrlConfigured, tokenConfigured, instanceConfigured, authHeader, sendPath, supportedMessageTypes, asyncEnabled, status]
+          properties:
+            configured: { type: boolean }
+            baseUrlConfigured: { type: boolean }
+            tokenConfigured: { type: boolean }
+            instanceConfigured: { type: boolean }
+            instanceName: { type: ["string", "null"] }
+            baseUrl: { type: string }
+            sendPath: { type: string }
+            authHeader: { type: string, enum: [apikey] }
+            supportedMessageTypes:
+              type: array
+              items: { type: string, enum: [text, buttons, list] }
+            asyncEnabled: { type: boolean }
+            status: { type: string, enum: [configured, not_configured] }
     WhatsappConfigUpdate:
       type: object
       properties:
@@ -757,6 +833,43 @@ components:
     WhatsappOutbox:
       type: object
       additionalProperties: true
+    WhatsappDeliveryEvent:
+      type: object
+      required: [id, clinicId, status, providerPayload, occurredAt, createdAt]
+      properties:
+        id: { type: string }
+        clinicId: { type: string }
+        outboxId: { type: ["string", "null"] }
+        providerMessageId: { type: ["string", "null"] }
+        status: { type: string, enum: [accepted, delivered, read] }
+        providerPayload: { type: object, additionalProperties: true }
+        occurredAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+    WhatsmiauWebhook:
+      type: object
+      required: [event, data]
+      properties:
+        event: { type: string, enum: [messages.update, MESSAGES_UPDATE] }
+        instance: { type: string }
+        date_time: { type: string, format: date-time }
+        data:
+          type: object
+          required: [status]
+          properties:
+            messageId: { type: string }
+            keyId: { type: string }
+            status: { type: string, enum: [DELIVERY_ACK, READ] }
+            instanceId: { type: string }
+          additionalProperties: true
+      additionalProperties: true
+    WhatsmiauWebhookAck:
+      type: object
+      required: [accepted, tracked]
+      properties:
+        accepted: { type: boolean }
+        tracked: { type: boolean }
+        providerMessageId: { type: string }
+        status: { type: string, enum: [delivered, read] }
     ClinicRecord:
       type: object
       additionalProperties: true

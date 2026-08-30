@@ -173,7 +173,22 @@ export const UpdateWhatsappConsentResponse = zod.record(zod.string(), zod.unknow
 /**
  * @summary Read WhatsApp automation configuration and provider status
  */
-export const GetWhatsappConfigResponse = zod.record(zod.string(), zod.unknown())
+export const GetWhatsappConfigResponse = zod.object({
+  "settings": zod.record(zod.string(), zod.unknown()),
+  "provider": zod.object({
+  "configured": zod.boolean(),
+  "baseUrlConfigured": zod.boolean(),
+  "tokenConfigured": zod.boolean(),
+  "instanceConfigured": zod.boolean(),
+  "instanceName": zod.string().nullish(),
+  "baseUrl": zod.string().optional(),
+  "sendPath": zod.string(),
+  "authHeader": zod.enum(['apikey']),
+  "supportedMessageTypes": zod.array(zod.enum(['text', 'buttons', 'list'])),
+  "asyncEnabled": zod.boolean(),
+  "status": zod.enum(['configured', 'not_configured'])
+})
+})
 
 
 /**
@@ -395,5 +410,57 @@ export const FinalizeAppointmentMediaBody = zod.object({
 })
 
 export const FinalizeAppointmentMediaResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * Receives the provider's messages.update callback. Only delivery metadata is retained; message content and chat identifiers are deliberately ignored. If WHATSMIAU_WEBHOOK_TOKEN is configured, the callback must include that token as the token query parameter or x-whatsmiau-webhook-token header.
+ * @summary Receive WhatsMiau delivery status callbacks
+ */
+export const ReceiveWhatsmiauWebhookQueryParams = zod.object({
+  "token": zod.coerce.string().optional().describe('Optional shared webhook token configured by the server.')
+})
+
+export const ReceiveWhatsmiauWebhookHeader = zod.object({
+  "x-whatsmiau-webhook-token": zod.string().optional()
+})
+
+export const ReceiveWhatsmiauWebhookBody = zod.object({
+  "event": zod.enum(['messages.update', 'MESSAGES_UPDATE']),
+  "instance": zod.string().optional(),
+  "date_time": zod.coerce.date().optional(),
+  "data": zod.object({
+  "messageId": zod.string().optional(),
+  "keyId": zod.string().optional(),
+  "status": zod.enum(['DELIVERY_ACK', 'READ']),
+  "instanceId": zod.string().optional()
+})
+})
+
+export const ReceiveWhatsmiauWebhookResponse = zod.object({
+  "accepted": zod.boolean(),
+  "tracked": zod.boolean(),
+  "providerMessageId": zod.string().optional(),
+  "status": zod.enum(['delivered', 'read']).optional()
+})
+
+
+/**
+ * @summary List idempotent delivery status events for an outbox item
+ */
+export const ListWhatsappDeliveryEventsParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ListWhatsappDeliveryEventsResponseItem = zod.object({
+  "id": zod.string(),
+  "clinicId": zod.string(),
+  "outboxId": zod.string().nullish(),
+  "providerMessageId": zod.string().nullish(),
+  "status": zod.enum(['accepted', 'delivered', 'read']),
+  "providerPayload": zod.record(zod.string(), zod.unknown()),
+  "occurredAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date()
+})
+export const ListWhatsappDeliveryEventsResponse = zod.array(ListWhatsappDeliveryEventsResponseItem)
 
 

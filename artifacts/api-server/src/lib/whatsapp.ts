@@ -55,6 +55,9 @@ const DEFAULT_TEMPLATES: Array<{
 
 export class WhatsappConfigurationError extends Error {}
 
+const WHATSMIAU_DEFAULT_BASE_URL = "https://api.whatsmiau.dev/v2";
+const WHATSMIAU_DEFAULT_SEND_PATH = "/message/sendText/:instance";
+
 function cleanValue(value: unknown): string {
   return String(value ?? "")
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
@@ -92,6 +95,10 @@ export function previewValues(eventType: WhatsappEventType): Record<string, stri
   return Object.fromEntries(WHATSAPP_VARIABLES[eventType].map((key) => [key, values[key]]));
 }
 
+export function isWhatsappAsyncEnabled() {
+  return process.env.WHATSMIAU_ASYNC_ENABLED?.trim().toLowerCase() === "true";
+}
+
 export async function ensureWhatsappTemplates(clinicId: string) {
   for (const template of DEFAULT_TEMPLATES) {
     await db.insert(whatsappTemplatesTable).values({
@@ -118,11 +125,17 @@ export async function getWhatsappConfig(clinicId: string) {
   return {
     settings,
     provider: {
-      configured: Boolean(process.env.WHATSMIAU_BASE_URL && process.env.WHATSMIAU_API_TOKEN),
+      configured: Boolean(process.env.WHATSMIAU_API_TOKEN && process.env.WHATSMIAU_INSTANCE_NAME),
       baseUrlConfigured: Boolean(process.env.WHATSMIAU_BASE_URL),
       tokenConfigured: Boolean(process.env.WHATSMIAU_API_TOKEN),
-      sendPath: process.env.WHATSMIAU_SEND_PATH || "/messages",
-      status: process.env.WHATSMIAU_BASE_URL && process.env.WHATSMIAU_API_TOKEN ? "configured" : "not_configured",
+      instanceConfigured: Boolean(process.env.WHATSMIAU_INSTANCE_NAME),
+      instanceName: process.env.WHATSMIAU_INSTANCE_NAME || null,
+      baseUrl: process.env.WHATSMIAU_BASE_URL || WHATSMIAU_DEFAULT_BASE_URL,
+      sendPath: process.env.WHATSMIAU_SEND_PATH || WHATSMIAU_DEFAULT_SEND_PATH,
+      authHeader: "apikey",
+      supportedMessageTypes: ["text", "buttons", "list"],
+      asyncEnabled: isWhatsappAsyncEnabled(),
+      status: process.env.WHATSMIAU_API_TOKEN && process.env.WHATSMIAU_INSTANCE_NAME ? "configured" : "not_configured",
     },
   };
 }
@@ -313,48 +326,167 @@ export async function enqueueDueWhatsappReminders(now = new Date()) {
 }
 
 function providerConfig() {
-  const baseUrl = process.env.WHATSMIAU_BASE_URL?.replace(/\/$/, "");
+  const baseUrl = (process.env.WHATSMIAU_BASE_URL || WHATSMIAU_DEFAULT_BASE_URL).replace(/\/$/, "");
   const token = process.env.WHATSMIAU_API_TOKEN;
-  if (!baseUrl || !token) {
-    throw new WhatsappConfigurationError("Whatsmiau não configurado: defina WHATSMIAU_BASE_URL e WHATSMIAU_API_TOKEN");
+  const instanceName = process.env.WHATSMIAU_INSTANCE_NAME?.trim();
+  if (!token || !instanceName) {
+    throw new WhatsappConfigurationError("Whatsmiau não configurado: defina WHATSMIAU_API_TOKEN e WHATSMIAU_INSTANCE_NAME");
   }
+  const sendPath = (process.env.WHATSMIAU_SEND_PATH || WHATSMIAU_DEFAULT_SEND_PATH).trim();
+  if (!sendPath.includes(":instance") && !sendPath.includes("{instance}")) {
+    throw new WhatsappConfigurationError("WHATSMIAU_SEND_PATH precisa conter :instance");
+  }
+  const encodedInstance = encodeURIComponent(instanceName);
   return {
-    url: `${baseUrl}${process.env.WHATSMIAU_SEND_PATH || "/messages"}`,
+    url: `${baseUrl}${sendPath.replace(":instance", encodedInstance).replace("{instance}", encodedInstance)}`,
     token,
-    timeout: Number(process.env.WHATSMIAU_TIMEOUT_MS || 10000),
+    timeout: Math.max(Number(process.env.WHATSMIAU_TIMEOUT_MS || 10000), 1000),
   };
 }
 
-async function sendToWhatsmiau(message: typeof whatsappOutboxTable.$inferSelect) {
+type WhatsappProviderMessage = Pick<typeof whatsappOutboxTable.$inferSelect, "phone" | "fallbackText" | "idempotencyKey">;
+
+export function buildWhatsmiauRequest(message: WhatsappProviderMessage) {
   const config = providerConfig();
+  if (!message.phone) {
+    throw new Error("Mensagem WhatsApp sem telefone");
+  }
+  return {
+    url: config.url,
+    timeout: config.timeout,
+    headers: {
+      "content-type": "application/json",
+      apikey: config.token,
+      "idempotency-key": message.idempotencyKey,
+    },
+    body: {
+      number: message.phone,
+      text: message.fallbackText,
+    },
+  };
+}
+
+function stringAt(value: unknown, ...keys: string[]) {
+  let current = value;
+  for (const key of keys) {
+    if (!current || typeof current !== "object") return null;
+    current = (current as Record<string, unknown>)[key];
+  }
+  return typeof current === "string" && current.trim() ? current.trim() : null;
+}
+
+export function extractWhatsmiauMessageId(body: unknown) {
+  return stringAt(body, "key", "id")
+    ?? stringAt(body, "data", "key", "id")
+    ?? stringAt(body, "messageId")
+    ?? stringAt(body, "data", "messageId")
+    ?? stringAt(body, "id")
+    ?? stringAt(body, "data", "id");
+}
+
+async function sendToWhatsmiau(message: WhatsappProviderMessage) {
+  const request = buildWhatsmiauRequest(message);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), config.timeout);
+  const timeout = setTimeout(() => controller.abort(), request.timeout);
   try {
-    const response = await fetch(config.url, {
+    const response = await fetch(request.url, {
       method: "POST",
       signal: controller.signal,
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${config.token}`,
-        "idempotency-key": message.idempotencyKey,
-      },
-      body: JSON.stringify({
-        to: message.phone,
-        text: message.fallbackText,
-        eventType: message.eventType,
-        payload: message.payload,
-      }),
+      headers: request.headers,
+      body: JSON.stringify(request.body),
     });
     const body = await response.json().catch(() => ({})) as Record<string, unknown>;
     if (!response.ok) throw new Error(`Whatsmiau HTTP ${response.status}`);
-    if (body.success !== true) throw new Error("Whatsmiau não confirmou sucesso (success=true ausente)");
-    const providerMessageId = typeof body.messageId === "string"
-      ? body.messageId
-      : typeof body.id === "string" ? body.id : null;
-    return { providerMessageId, body };
+    const providerMessageId = extractWhatsmiauMessageId(body);
+    if (!providerMessageId) throw new Error("Whatsmiau não confirmou sucesso (key.id ausente)");
+    return { providerMessageId };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+type WhatsmiauDelivery = {
+  providerMessageId: string;
+  status: "delivered" | "read";
+  occurredAt: Date;
+  providerPayload: Record<string, unknown>;
+};
+
+export function parseWhatsmiauDeliveryWebhook(input: unknown): WhatsmiauDelivery | null {
+  if (!input || typeof input !== "object") return null;
+  const envelope = input as Record<string, unknown>;
+  const event = typeof envelope.event === "string" ? envelope.event.toLowerCase().replace("_", ".") : "";
+  if (event !== "messages.update") return null;
+  const data = envelope.data;
+  if (!data || typeof data !== "object") return null;
+  const delivery = data as Record<string, unknown>;
+  const providerMessageId = stringAt(delivery, "messageId")
+    ?? stringAt(delivery, "keyId")
+    ?? stringAt(delivery, "key", "id");
+  const rawStatus = typeof delivery.status === "string" ? delivery.status.toUpperCase() : "";
+  const status = rawStatus === "DELIVERY_ACK" ? "delivered" : rawStatus === "READ" ? "read" : null;
+  if (!providerMessageId || !status) return null;
+  const rawDate = typeof envelope.date_time === "string" ? envelope.date_time : "";
+  const parsedDate = rawDate ? new Date(rawDate) : new Date();
+  const occurredAt = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+  return {
+    providerMessageId,
+    status,
+    occurredAt,
+    // Keep only delivery metadata. In particular, do not persist message text,
+    // remote JIDs, or any other provider payload that could contain clinical data.
+    providerPayload: {
+      event: "messages.update",
+      instance: stringAt(envelope, "instance") ?? stringAt(delivery, "instanceId"),
+      status: rawStatus,
+      messageId: providerMessageId,
+      date_time: rawDate || occurredAt.toISOString(),
+    },
+  };
+}
+
+const DELIVERY_STATUS_RANK: Record<string, number> = {
+  sent: 0,
+  delivered: 1,
+  read: 2,
+};
+
+export async function recordWhatsmiauDelivery(input: unknown) {
+  const delivery = parseWhatsmiauDeliveryWebhook(input);
+  if (!delivery) return { accepted: false as const, tracked: false as const };
+
+  const [outbox] = await db.select().from(whatsappOutboxTable)
+    .where(eq(whatsappOutboxTable.providerMessageId, delivery.providerMessageId))
+    .limit(1);
+  if (!outbox) {
+    // A webhook can race the response that links an outbox row to the provider ID.
+    // Acknowledge it, but do not create an orphan event without a clinic owner.
+    return { accepted: true as const, tracked: false as const, providerMessageId: delivery.providerMessageId };
+  }
+
+  await db.insert(whatsappDeliveryEventsTable).values({
+    clinicId: outbox.clinicId,
+    outboxId: outbox.id,
+    providerMessageId: delivery.providerMessageId,
+    status: delivery.status,
+    providerPayload: delivery.providerPayload,
+    occurredAt: delivery.occurredAt,
+  }).onConflictDoNothing();
+
+  const currentRank = DELIVERY_STATUS_RANK[outbox.status] ?? -1;
+  const deliveryRank = DELIVERY_STATUS_RANK[delivery.status] ?? -1;
+  if (deliveryRank > currentRank) {
+    await db.update(whatsappOutboxTable).set({
+      status: delivery.status,
+      updatedAt: new Date(),
+    }).where(eq(whatsappOutboxTable.id, outbox.id));
+  }
+  return {
+    accepted: true as const,
+    tracked: true as const,
+    providerMessageId: delivery.providerMessageId,
+    status: delivery.status,
+  };
 }
 
 export async function processWhatsappMessage(id: string, clinicId: string) {
@@ -399,8 +531,11 @@ export async function processWhatsappMessage(id: string, clinicId: string) {
         outboxId: id,
         providerMessageId: delivered.providerMessageId,
         status: "accepted",
-        providerPayload: { success: true },
-      });
+        providerPayload: {
+          provider: "whatsmiau",
+          messageId: delivered.providerMessageId,
+        },
+      }).onConflictDoNothing();
     }
     return sent ?? claimed;
   } catch (error) {
@@ -438,6 +573,7 @@ export async function processWhatsappOutboxBatch(limit = 20) {
 export function startWhatsappWorker() {
   const intervalMs = Number(process.env.WHATSMIAU_WORKER_INTERVAL_MS || 60000);
   const run = async () => {
+    if (!isWhatsappAsyncEnabled()) return;
     try {
       await enqueueDueWhatsappReminders();
       await processWhatsappOutboxBatch();

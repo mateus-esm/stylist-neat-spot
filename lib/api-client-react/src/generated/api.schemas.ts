@@ -139,7 +139,51 @@ export interface WhatsappOutboxInput {
   templateKey?: string;
 }
 
-export interface WhatsappConfig { [key: string]: unknown }
+export type WhatsappConfigProviderAuthHeader = typeof WhatsappConfigProviderAuthHeader[keyof typeof WhatsappConfigProviderAuthHeader];
+
+
+export const WhatsappConfigProviderAuthHeader = {
+  apikey: 'apikey',
+} as const;
+
+export type WhatsappConfigProviderSupportedMessageTypesItem = typeof WhatsappConfigProviderSupportedMessageTypesItem[keyof typeof WhatsappConfigProviderSupportedMessageTypesItem];
+
+
+export const WhatsappConfigProviderSupportedMessageTypesItem = {
+  text: 'text',
+  buttons: 'buttons',
+  list: 'list',
+} as const;
+
+export type WhatsappConfigProviderStatus = typeof WhatsappConfigProviderStatus[keyof typeof WhatsappConfigProviderStatus];
+
+
+export const WhatsappConfigProviderStatus = {
+  configured: 'configured',
+  not_configured: 'not_configured',
+} as const;
+
+export type WhatsappConfigProvider = {
+  configured: boolean;
+  baseUrlConfigured: boolean;
+  tokenConfigured: boolean;
+  instanceConfigured: boolean;
+  /** @nullable */
+  instanceName?: string | null;
+  baseUrl?: string;
+  sendPath: string;
+  authHeader: WhatsappConfigProviderAuthHeader;
+  supportedMessageTypes: WhatsappConfigProviderSupportedMessageTypesItem[];
+  asyncEnabled: boolean;
+  status: WhatsappConfigProviderStatus;
+};
+
+export interface WhatsappSettings { [key: string]: unknown }
+
+export interface WhatsappConfig {
+  settings: WhatsappSettings;
+  provider: WhatsappConfigProvider;
+}
 
 export interface WhatsappConfigUpdate {
   enabled?: boolean;
@@ -150,8 +194,6 @@ export interface WhatsappConfigUpdate {
   reminderHours?: number[];
   timezone?: string;
 }
-
-export interface WhatsappSettings { [key: string]: unknown }
 
 export interface WhatsappTemplate { [key: string]: unknown }
 
@@ -219,6 +261,77 @@ export interface WhatsappTemplateTestInput {
 
 export interface WhatsappOutbox { [key: string]: unknown }
 
+export type WhatsappDeliveryEventStatus = typeof WhatsappDeliveryEventStatus[keyof typeof WhatsappDeliveryEventStatus];
+
+
+export const WhatsappDeliveryEventStatus = {
+  accepted: 'accepted',
+  delivered: 'delivered',
+  read: 'read',
+} as const;
+
+export type WhatsappDeliveryEventProviderPayload = { [key: string]: unknown };
+
+export interface WhatsappDeliveryEvent {
+  id: string;
+  clinicId: string;
+  /** @nullable */
+  outboxId?: string | null;
+  /** @nullable */
+  providerMessageId?: string | null;
+  status: WhatsappDeliveryEventStatus;
+  providerPayload: WhatsappDeliveryEventProviderPayload;
+  occurredAt: string;
+  createdAt: string;
+}
+
+export type WhatsmiauWebhookEvent = typeof WhatsmiauWebhookEvent[keyof typeof WhatsmiauWebhookEvent];
+
+
+export const WhatsmiauWebhookEvent = {
+  messagesupdate: 'messages.update',
+  MESSAGES_UPDATE: 'MESSAGES_UPDATE',
+} as const;
+
+export type WhatsmiauWebhookDataStatus = typeof WhatsmiauWebhookDataStatus[keyof typeof WhatsmiauWebhookDataStatus];
+
+
+export const WhatsmiauWebhookDataStatus = {
+  DELIVERY_ACK: 'DELIVERY_ACK',
+  READ: 'READ',
+} as const;
+
+export type WhatsmiauWebhookData = {
+  messageId?: string;
+  keyId?: string;
+  status: WhatsmiauWebhookDataStatus;
+  instanceId?: string;
+  [key: string]: unknown;
+ };
+
+export interface WhatsmiauWebhook {
+  event: WhatsmiauWebhookEvent;
+  instance?: string;
+  date_time?: string;
+  data: WhatsmiauWebhookData;
+  [key: string]: unknown;
+ }
+
+export type WhatsmiauWebhookAckStatus = typeof WhatsmiauWebhookAckStatus[keyof typeof WhatsmiauWebhookAckStatus];
+
+
+export const WhatsmiauWebhookAckStatus = {
+  delivered: 'delivered',
+  read: 'read',
+} as const;
+
+export interface WhatsmiauWebhookAck {
+  accepted: boolean;
+  tracked: boolean;
+  providerMessageId?: string;
+  status?: WhatsmiauWebhookAckStatus;
+}
+
 export interface ClinicRecord { [key: string]: unknown }
 
 export type ClinicRecordList = ClinicRecord[];
@@ -276,5 +389,12 @@ export type EnqueueWhatsappMessage201 = { [key: string]: unknown };
 export type ListClinicRecordsParams = {
 filters?: string;
 order?: string;
+};
+
+export type ReceiveWhatsmiauWebhookParams = {
+/**
+ * Optional shared webhook token configured by the server.
+ */
+token?: string;
 };
 

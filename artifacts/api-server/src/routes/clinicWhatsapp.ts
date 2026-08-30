@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { and, asc, eq, isNull, or } from "drizzle-orm";
@@ -26,11 +27,41 @@ import {
   getWhatsappConfig,
   processWhatsappMessage,
   previewValues,
+  recordWhatsmiauDelivery,
   renderWhatsappTemplate,
   WHATSAPP_VARIABLES,
 } from "../lib/whatsapp";
 
 const router: IRouter = Router();
+
+function hasValidWebhookToken(req: Request) {
+  const expected = process.env.WHATSMIAU_WEBHOOK_TOKEN?.trim();
+  if (!expected) return true;
+  const queryToken = typeof req.query.token === "string" ? req.query.token : undefined;
+  const headerToken = req.header("x-whatsmiau-webhook-token");
+  const provided = queryToken ?? headerToken;
+  if (!provided) return false;
+  const expectedBuffer = Buffer.from(expected);
+  const providedBuffer = Buffer.from(provided);
+  return expectedBuffer.length === providedBuffer.length
+    && timingSafeEqual(expectedBuffer, providedBuffer);
+}
+
+// WhatsMiau has no documented webhook signature. Use the optional shared token
+// gate when configured, and never require clinic authentication from the provider.
+router.post("/webhooks/whatsmiau", async (req: Request, res: Response): Promise<void> => {
+  if (!hasValidWebhookToken(req)) {
+    res.status(401).json({ error: "Webhook token inválido" });
+    return;
+  }
+  const result = await recordWhatsmiauDelivery(req.body);
+  if (!result.accepted) {
+    res.status(400).json({ error: "Evento Whatsmiau inválido ou não suportado" });
+    return;
+  }
+  res.status(200).json(result);
+});
+
 router.use(requireClinicAuth);
 
 const ConsentBody = z.object({
