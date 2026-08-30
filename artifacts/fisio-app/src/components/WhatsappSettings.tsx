@@ -44,12 +44,23 @@ type WhatsappConfig = {
   reminderHours?: number[];
   reminder_hours?: number[];
   timezone?: string;
-  provider?: string | { configured?: boolean; baseUrlConfigured?: boolean; tokenConfigured?: boolean; sendPath?: string; status?: string };
-  settings?: { enabled?: boolean; reminderHours?: number[]; timezone?: string };
+  instanceName?: string | null;
+  connectionStatus?: string;
+  connectedPhone?: string | null;
+  provider?: string | { configured?: boolean; baseUrlConfigured?: boolean; tokenConfigured?: boolean; instanceName?: string | null; sendPath?: string; status?: string };
+  settings?: { enabled?: boolean; reminderHours?: number[]; timezone?: string; instanceName?: string | null; connectionStatus?: string; connectedPhone?: string | null };
   providerStatus?: string;
   provider_status?: string;
   phoneNumber?: string;
   phone_number?: string;
+};
+
+type WhatsappInstance = {
+  instanceName: string | null;
+  status: string;
+  phoneNumber: string | null;
+  qrCode?: string | null;
+  qrExpiresAt?: string | null;
 };
 
 type OutboxItem = {
@@ -98,6 +109,11 @@ const formatDate = (value?: string) => {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 };
 
+const qrImageSource = (value?: string | null) => {
+  if (!value) return "";
+  return value.startsWith("data:image") ? value : `data:image/png;base64,${value}`;
+};
+
 const statusLabel = (status?: string) => {
   const labels: Record<string, string> = {
     pending: "Pendente",
@@ -126,6 +142,7 @@ const WhatsappSettings = () => {
   const [variables, setVariables] = useState<Record<WhatsappEventType, string[]>>({} as Record<WhatsappEventType, string[]>);
   const [outbox, setOutbox] = useState<OutboxItem[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [instance, setInstance] = useState<WhatsappInstance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
@@ -164,6 +181,12 @@ const WhatsappSettings = () => {
       } as WhatsappConfig;
       const nextHours = nextConfig.reminderHours ?? nextConfig.reminder_hours ?? [];
       setConfig(nextConfig);
+      const provider = typeof nextConfig.provider === "object" ? nextConfig.provider : undefined;
+      setInstance({
+        instanceName: nextConfig.instanceName ?? nextConfig.settings?.instanceName ?? provider?.instanceName ?? null,
+        status: nextConfig.connectionStatus ?? nextConfig.settings?.connectionStatus ?? nextConfig.providerStatus ?? provider?.status ?? "not_configured",
+        phoneNumber: nextConfig.connectedPhone ?? nextConfig.settings?.connectedPhone ?? nextConfig.phoneNumber ?? nextConfig.phone_number ?? null,
+      });
       setConfigForm({
         enabled: Boolean(nextConfig.enabled),
         reminderHours: nextHours.map(Number).filter((hour) => reminderOptions.includes(hour)),
@@ -183,6 +206,26 @@ const WhatsappSettings = () => {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (instance?.status !== "awaiting_qr") return;
+    const timer = window.setInterval(async () => {
+      try {
+        const result = await clinicApi.whatsappInstanceStatus();
+        setInstance((current) => ({
+          instanceName: result.instanceName ?? current?.instanceName ?? null,
+          status: result.status ?? current?.status ?? "unknown",
+          phoneNumber: result.phoneNumber ?? current?.phoneNumber ?? null,
+          qrCode: current?.qrCode ?? null,
+          qrExpiresAt: current?.qrExpiresAt ?? null,
+        }));
+      } catch {
+        // The QR may be temporarily unavailable while the provider restarts.
+        // Keep the current QR visible and let the user retry explicitly.
+      }
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [instance?.status]);
 
   const activeTemplate = useMemo(
     () => templates.find((template) => template.id === editingId),
@@ -347,6 +390,73 @@ const WhatsappSettings = () => {
     }
   };
 
+  const connectInstance = async () => {
+    setBusy("instance-connect");
+    try {
+      const result = await clinicApi.connectWhatsappInstance();
+      setInstance({
+        instanceName: result.instanceName ?? null,
+        status: result.status ?? "awaiting_qr",
+        phoneNumber: result.phoneNumber ?? null,
+        qrCode: result.qrCode ?? null,
+        qrExpiresAt: result.qrExpiresAt ?? null,
+      });
+      await load();
+      setInstance((current) => ({
+        instanceName: result.instanceName ?? current?.instanceName ?? null,
+        status: result.status ?? current?.status ?? "awaiting_qr",
+        phoneNumber: result.phoneNumber ?? current?.phoneNumber ?? null,
+        qrCode: result.qrCode ?? current?.qrCode ?? null,
+        qrExpiresAt: result.qrExpiresAt ?? current?.qrExpiresAt ?? null,
+      }));
+      toast.success(result.status === "connected" ? "Número conectado" : "QR code gerado");
+    } catch (mutationError: any) {
+      toast.error(mutationError?.message || "Não foi possível conectar a instância");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const refreshInstanceStatus = async () => {
+    setBusy("instance-status");
+    try {
+      const result = await clinicApi.whatsappInstanceStatus();
+      setInstance((current) => ({
+        instanceName: result.instanceName ?? current?.instanceName ?? null,
+        status: result.status ?? "unknown",
+        phoneNumber: result.phoneNumber ?? null,
+        qrCode: null,
+        qrExpiresAt: null,
+      }));
+      toast.success("Status atualizado");
+    } catch (mutationError: any) {
+      toast.error(mutationError?.message || "Não foi possível consultar a instância");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const disconnectInstance = async () => {
+    if (!window.confirm("Desconectar o número do WhatsApp desta clínica?")) return;
+    setBusy("instance-disconnect");
+    try {
+      const result = await clinicApi.disconnectWhatsappInstance();
+      setInstance({
+        instanceName: result.instanceName ?? instance?.instanceName ?? null,
+        status: "disconnected",
+        phoneNumber: null,
+        qrCode: null,
+        qrExpiresAt: null,
+      });
+      await load();
+      toast.success("Número desconectado");
+    } catch (mutationError: any) {
+      toast.error(mutationError?.message || "Não foi possível desconectar o número");
+    } finally {
+      setBusy("");
+    }
+  };
+
   const toggleReminderHour = (hour: number) => {
     setConfigForm((current) => ({
       ...current,
@@ -385,14 +495,14 @@ const WhatsappSettings = () => {
     );
   }
 
-  const providerStatus = config?.providerStatus ?? config?.provider_status
+  const providerStatus = instance?.status ?? config?.connectionStatus ?? config?.providerStatus ?? config?.provider_status
     ?? (typeof config?.provider === "object" && config.provider?.configured ? "configured" : "not_configured");
   const providerLabel = typeof config?.provider === "string"
     ? config.provider
     : config?.provider?.configured
       ? `Whatsmiau · ${config.provider.sendPath ?? "/messages"}`
       : "Whatsmiau configurado pelo servidor";
-  const providerReady = providerStatus === "connected" || providerStatus === "active" || providerStatus === "ready";
+  const providerReady = providerStatus === "connected" || providerStatus === "active" || providerStatus === "ready" || providerStatus === "open";
 
   return (
     <section className="space-y-5" data-testid="section-whatsapp-settings">
@@ -458,7 +568,7 @@ const WhatsappSettings = () => {
                       {providerLabel}
                     </p>
                     <p className={`mt-1 text-xs ${providerReady ? "text-success" : "text-muted-foreground"}`} data-testid="status-whatsapp-provider">
-                      {providerReady ? "Conectado e pronto para operar" : providerStatus === "configured" ? "Configurado; a confirmação ocorre no primeiro envio" : "Whatsmiau ainda não está configurado no servidor"}
+                       {providerReady ? `Conectado${instance?.phoneNumber ? ` · ${instance.phoneNumber}` : ""} e pronto para operar` : providerStatus === "awaiting_qr" ? "Aguardando leitura do QR code" : providerStatus === "configured" ? "Configurado; conecte um número para começar" : "Whatsmiau ainda não está configurado no servidor"}
                     </p>
                   </div>
                 </div>
@@ -490,6 +600,45 @@ const WhatsappSettings = () => {
                 <Input id="whatsapp-timezone" value={configForm.timezone} onChange={(event) => setConfigForm((current) => ({ ...current, timezone: event.target.value }))} className="rounded-sm" data-testid="input-whatsapp-timezone" />
               </div>
             </div>
+             <div className="rounded-sm border border-border bg-background p-4">
+               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                 <div className="flex gap-3">
+                   <Smartphone className="mt-0.5 h-4 w-4 text-primary" />
+                   <div>
+                     <p className="text-sm font-semibold">Conectar número da clínica</p>
+                     <p className="mt-1 max-w-xl text-xs leading-5 text-muted-foreground">
+                       Gere o QR code, leia com o WhatsApp do número da clínica e aguarde a confirmação da conexão.
+                     </p>
+                     {instance?.instanceName && <p className="mt-2 font-mono-data text-[11px] text-muted-foreground">instância: {instance.instanceName}</p>}
+                   </div>
+                 </div>
+                 <div className="flex shrink-0 flex-wrap gap-2">
+                   <Button type="button" variant="outline" size="sm" className="rounded-sm gap-1.5" onClick={connectInstance} disabled={busy === "instance-connect"} data-testid="button-connect-whatsapp-instance">
+                     {busy === "instance-connect" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Smartphone className="h-3.5 w-3.5" />}
+                     {providerReady ? "Novo QR code" : "Conectar por QR"}
+                   </Button>
+                   {instance?.instanceName && (
+                     <Button type="button" variant="outline" size="sm" className="rounded-sm gap-1.5" onClick={refreshInstanceStatus} disabled={busy === "instance-status"} data-testid="button-refresh-whatsapp-instance">
+                       {busy === "instance-status" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Status
+                     </Button>
+                   )}
+                   {instance?.status === "connected" && (
+                     <Button type="button" variant="ghost" size="sm" className="rounded-sm gap-1.5 text-destructive hover:text-destructive" onClick={disconnectInstance} disabled={busy === "instance-disconnect"} data-testid="button-disconnect-whatsapp-instance">
+                       {busy === "instance-disconnect" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />} Desconectar
+                     </Button>
+                   )}
+                 </div>
+               </div>
+               {instance?.qrCode && (
+                 <div className="mt-4 flex flex-col items-center gap-3 rounded-sm border border-primary/20 bg-primary/5 p-4 text-center">
+                   <img src={qrImageSource(instance.qrCode)} alt="QR code para conectar o WhatsApp da clínica" className="h-56 w-56 rounded-sm bg-white p-2" data-testid="img-whatsapp-qr-code" />
+                   <div>
+                     <p className="text-sm font-semibold">Leia este QR code no WhatsApp</p>
+                     <p className="mt-1 text-xs text-muted-foreground">Abra Dispositivos conectados → Conectar dispositivo. O código expira em aproximadamente 2 minutos.</p>
+                   </div>
+                 </div>
+               )}
+             </div>
             <div className="flex justify-end">
               <Button type="submit" disabled={busy === "config"} className="rounded-sm gap-2" data-testid="button-save-whatsapp-config">
                 {busy === "config" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}

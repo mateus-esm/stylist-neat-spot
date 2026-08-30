@@ -25,6 +25,10 @@ import {
   enqueueWhatsappEvent,
   ensureWhatsappTemplates,
   getWhatsappConfig,
+  connectWhatsmiauInstance,
+  createWhatsmiauInstance,
+  disconnectWhatsmiauInstance,
+  getWhatsmiauInstanceStatus,
   processWhatsappMessage,
   previewValues,
   recordWhatsmiauDelivery,
@@ -164,6 +168,110 @@ router.patch("/clinic/whatsapp/config", async (req: Request, res: Response): Pro
     resourceId: settings.id, metadata: parsed.data,
   });
   res.json(settings);
+});
+
+function generatedInstanceName(clinicId: string) {
+  return `fisio-${clinicId.replace(/-/g, "").slice(0, 16)}`;
+}
+
+async function clinicWhatsappSettings(clinicId: string) {
+  let [settings] = await db.select().from(whatsappSettingsTable)
+    .where(eq(whatsappSettingsTable.clinicId, clinicId)).limit(1);
+  if (!settings) {
+    [settings] = await db.insert(whatsappSettingsTable)
+      .values({ clinicId }).returning();
+  }
+  return settings;
+}
+
+function normalizeConnectionStatus(status: string) {
+  if (status === "connected" || status === "open") return "connected";
+  if (status === "awaiting_qr" || status === "connecting" || status === "qr") return "awaiting_qr";
+  if (status === "disconnected" || status === "close" || status === "closed") return "disconnected";
+  return "unknown";
+}
+
+router.post("/clinic/whatsapp/instance/connect", async (req: Request, res: Response): Promise<void> => {
+  const admin = await adminContext(req, res);
+  if (!admin) return;
+  try {
+    const current = await clinicWhatsappSettings(admin.clinicId);
+    const instanceName = current.instanceName ?? generatedInstanceName(admin.clinicId);
+    const connection = current.instanceName
+      ? await connectWhatsmiauInstance(instanceName)
+      : await createWhatsmiauInstance(instanceName);
+    const connectionStatus = normalizeConnectionStatus(connection.status);
+    const [settings] = await db.update(whatsappSettingsTable).set({
+      instanceName,
+      connectionStatus,
+      connectedPhone: connection.phoneNumber,
+      lastProviderSyncAt: new Date(),
+      updatedBy: admin.userId,
+      updatedAt: new Date(),
+    }).where(eq(whatsappSettingsTable.clinicId, admin.clinicId)).returning();
+    res.json({
+      settings,
+      instanceName,
+      status: connectionStatus,
+      phoneNumber: connection.phoneNumber,
+      qrCode: connection.qrCode,
+      qrExpiresAt: connection.qrExpiresAt,
+    });
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : "Não foi possível conectar o WhatsApp" });
+  }
+});
+
+router.get("/clinic/whatsapp/instance/status", async (req: Request, res: Response): Promise<void> => {
+  const admin = await adminContext(req, res);
+  if (!admin) return;
+  try {
+    const current = await clinicWhatsappSettings(admin.clinicId);
+    const instanceName = current.instanceName;
+    if (!instanceName) {
+      res.json({ status: "not_configured", instanceName: null, phoneNumber: null });
+      return;
+    }
+    const connection = await getWhatsmiauInstanceStatus(instanceName);
+    const status = normalizeConnectionStatus(connection.status);
+    const [settings] = await db.update(whatsappSettingsTable).set({
+      connectionStatus: status,
+      connectedPhone: connection.phoneNumber,
+      lastProviderSyncAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(whatsappSettingsTable.clinicId, admin.clinicId)).returning();
+    res.json({
+      settings,
+      instanceName,
+      status,
+      phoneNumber: connection.phoneNumber,
+    });
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : "Não foi possível consultar o WhatsApp" });
+  }
+});
+
+router.post("/clinic/whatsapp/instance/disconnect", async (req: Request, res: Response): Promise<void> => {
+  const admin = await adminContext(req, res);
+  if (!admin) return;
+  try {
+    const current = await clinicWhatsappSettings(admin.clinicId);
+    if (!current.instanceName) {
+      res.json({ status: "not_configured", instanceName: null });
+      return;
+    }
+    const result = await disconnectWhatsmiauInstance(current.instanceName);
+    const [settings] = await db.update(whatsappSettingsTable).set({
+      connectionStatus: "disconnected",
+      connectedPhone: null,
+      lastProviderSyncAt: new Date(),
+      updatedBy: admin.userId,
+      updatedAt: new Date(),
+    }).where(eq(whatsappSettingsTable.clinicId, admin.clinicId)).returning();
+    res.json({ settings, instanceName: result.instanceName, status: "disconnected" });
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : "Não foi possível desconectar o WhatsApp" });
+  }
 });
 
 router.get("/clinic/whatsapp/templates", async (req: Request, res: Response): Promise<void> => {

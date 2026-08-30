@@ -45,6 +45,12 @@ export const clinicApi = {
   whatsappConfig: () => request<any>("/clinic/whatsapp/config"),
   updateWhatsappConfig: (body: { enabled?: boolean; reminderHours?: number[]; timezone?: string }) =>
     request<any>("/clinic/whatsapp/config", { method: "PATCH", body: JSON.stringify(body) }),
+  connectWhatsappInstance: () =>
+    request<any>("/clinic/whatsapp/instance/connect", { method: "POST" }),
+  whatsappInstanceStatus: () =>
+    request<any>("/clinic/whatsapp/instance/status"),
+  disconnectWhatsappInstance: () =>
+    request<any>("/clinic/whatsapp/instance/disconnect", { method: "POST" }),
   whatsappTemplates: () => request<{ templates: any[]; variables: Record<WhatsappEventType, string[]> }>("/clinic/whatsapp/templates"),
   createWhatsappTemplate: (body: { key: string; eventType: WhatsappEventType; label: string; body: string; active?: boolean }) =>
     request<any>("/clinic/whatsapp/templates", { method: "POST", body: JSON.stringify(body) }),
