@@ -42,6 +42,7 @@ import type {
   ListClinicAuditEvents200Item,
   ListClinicRecordsParams,
   ListWhatsappOutbox200Item,
+  ListWhatsappTemplates200,
   PatientInvite,
   PatientInviteInput,
   PatientPortal,
@@ -50,8 +51,18 @@ import type {
   TransferClinicAppointment200,
   TransferClinicAppointmentBody,
   UpdateWhatsappConsent200,
+  WhatsappConfig,
+  WhatsappConfigUpdate,
   WhatsappConsentInput,
-  WhatsappOutboxInput
+  WhatsappOutbox,
+  WhatsappOutboxInput,
+  WhatsappSettings,
+  WhatsappTemplate,
+  WhatsappTemplateInput,
+  WhatsappTemplatePreview,
+  WhatsappTemplatePreviewInput,
+  WhatsappTemplateTestInput,
+  WhatsappTemplateUpdate
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1275,6 +1286,588 @@ export const useUpdateWhatsappConsent = <TError = ErrorType<unknown>,
       return useMutation(getUpdateWhatsappConsentMutationOptions(options));
     }
 
+export const getGetWhatsappConfigUrl = () => {
+
+
+
+
+  return `/api/clinic/whatsapp/config`
+}
+
+/**
+ * @summary Read WhatsApp automation configuration and provider status
+ */
+export const getWhatsappConfig = async ( options?: Parameters<typeof customFetch>[1]): Promise<WhatsappConfig> => {
+
+  return customFetch<WhatsappConfig>(getGetWhatsappConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWhatsappConfigQueryKey = () => {
+    return [
+    `/api/clinic/whatsapp/config`
+    ] as const;
+    }
+
+
+export const getGetWhatsappConfigQueryOptions = <TData = Awaited<ReturnType<typeof getWhatsappConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWhatsappConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWhatsappConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWhatsappConfig>>> = ({ signal }) => getWhatsappConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWhatsappConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWhatsappConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getWhatsappConfig>>>
+export type GetWhatsappConfigQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Read WhatsApp automation configuration and provider status
+ */
+
+export function useGetWhatsappConfig<TData = Awaited<ReturnType<typeof getWhatsappConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWhatsappConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWhatsappConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateWhatsappConfigUrl = () => {
+
+
+
+
+  return `/api/clinic/whatsapp/config`
+}
+
+/**
+ * @summary Update WhatsApp automation and reminder windows
+ */
+export const updateWhatsappConfig = async (whatsappConfigUpdate: WhatsappConfigUpdate, options?: Parameters<typeof customFetch>[1]): Promise<WhatsappSettings> => {
+
+  return customFetch<WhatsappSettings>(getUpdateWhatsappConfigUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(whatsappConfigUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateWhatsappConfigMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWhatsappConfig>>, TError,{data: BodyType<WhatsappConfigUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWhatsappConfig>>, TError,{data: BodyType<WhatsappConfigUpdate>}, TContext> => {
+
+const mutationKey = ['updateWhatsappConfig'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWhatsappConfig>>, {data: BodyType<WhatsappConfigUpdate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateWhatsappConfig(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWhatsappConfigMutationResult = NonNullable<Awaited<ReturnType<typeof updateWhatsappConfig>>>
+    export type UpdateWhatsappConfigMutationBody = BodyType<WhatsappConfigUpdate>
+    export type UpdateWhatsappConfigMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update WhatsApp automation and reminder windows
+ */
+export const useUpdateWhatsappConfig = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWhatsappConfig>>, TError,{data: BodyType<WhatsappConfigUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateWhatsappConfig>>,
+        TError,
+        {data: BodyType<WhatsappConfigUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateWhatsappConfigMutationOptions(options));
+    }
+
+export const getListWhatsappTemplatesUrl = () => {
+
+
+
+
+  return `/api/clinic/whatsapp/templates`
+}
+
+/**
+ * @summary List clinic WhatsApp templates and allowed variables
+ */
+export const listWhatsappTemplates = async ( options?: Parameters<typeof customFetch>[1]): Promise<ListWhatsappTemplates200> => {
+
+  return customFetch<ListWhatsappTemplates200>(getListWhatsappTemplatesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWhatsappTemplatesQueryKey = () => {
+    return [
+    `/api/clinic/whatsapp/templates`
+    ] as const;
+    }
+
+
+export const getListWhatsappTemplatesQueryOptions = <TData = Awaited<ReturnType<typeof listWhatsappTemplates>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWhatsappTemplates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWhatsappTemplatesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWhatsappTemplates>>> = ({ signal }) => listWhatsappTemplates({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWhatsappTemplates>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWhatsappTemplatesQueryResult = NonNullable<Awaited<ReturnType<typeof listWhatsappTemplates>>>
+export type ListWhatsappTemplatesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List clinic WhatsApp templates and allowed variables
+ */
+
+export function useListWhatsappTemplates<TData = Awaited<ReturnType<typeof listWhatsappTemplates>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWhatsappTemplates>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWhatsappTemplatesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateWhatsappTemplateUrl = () => {
+
+
+
+
+  return `/api/clinic/whatsapp/templates`
+}
+
+/**
+ * @summary Create a WhatsApp template
+ */
+export const createWhatsappTemplate = async (whatsappTemplateInput: WhatsappTemplateInput, options?: Parameters<typeof customFetch>[1]): Promise<WhatsappTemplate> => {
+
+  return customFetch<WhatsappTemplate>(getCreateWhatsappTemplateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(whatsappTemplateInput)
+  }
+);}
+
+
+
+
+
+export const getCreateWhatsappTemplateMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWhatsappTemplate>>, TError,{data: BodyType<WhatsappTemplateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createWhatsappTemplate>>, TError,{data: BodyType<WhatsappTemplateInput>}, TContext> => {
+
+const mutationKey = ['createWhatsappTemplate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createWhatsappTemplate>>, {data: BodyType<WhatsappTemplateInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createWhatsappTemplate(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateWhatsappTemplateMutationResult = NonNullable<Awaited<ReturnType<typeof createWhatsappTemplate>>>
+    export type CreateWhatsappTemplateMutationBody = BodyType<WhatsappTemplateInput>
+    export type CreateWhatsappTemplateMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a WhatsApp template
+ */
+export const useCreateWhatsappTemplate = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWhatsappTemplate>>, TError,{data: BodyType<WhatsappTemplateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createWhatsappTemplate>>,
+        TError,
+        {data: BodyType<WhatsappTemplateInput>},
+        TContext
+      > => {
+      return useMutation(getCreateWhatsappTemplateMutationOptions(options));
+    }
+
+export const getPreviewWhatsappTemplateUrl = () => {
+
+
+
+
+  return `/api/clinic/whatsapp/templates/preview`
+}
+
+/**
+ * @summary Render a safe template preview using non-clinical sample values
+ */
+export const previewWhatsappTemplate = async (whatsappTemplatePreviewInput: WhatsappTemplatePreviewInput, options?: Parameters<typeof customFetch>[1]): Promise<WhatsappTemplatePreview> => {
+
+  return customFetch<WhatsappTemplatePreview>(getPreviewWhatsappTemplateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(whatsappTemplatePreviewInput)
+  }
+);}
+
+
+
+
+
+export const getPreviewWhatsappTemplateMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewWhatsappTemplate>>, TError,{data: BodyType<WhatsappTemplatePreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewWhatsappTemplate>>, TError,{data: BodyType<WhatsappTemplatePreviewInput>}, TContext> => {
+
+const mutationKey = ['previewWhatsappTemplate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewWhatsappTemplate>>, {data: BodyType<WhatsappTemplatePreviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewWhatsappTemplate(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewWhatsappTemplateMutationResult = NonNullable<Awaited<ReturnType<typeof previewWhatsappTemplate>>>
+    export type PreviewWhatsappTemplateMutationBody = BodyType<WhatsappTemplatePreviewInput>
+    export type PreviewWhatsappTemplateMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Render a safe template preview using non-clinical sample values
+ */
+export const usePreviewWhatsappTemplate = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewWhatsappTemplate>>, TError,{data: BodyType<WhatsappTemplatePreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewWhatsappTemplate>>,
+        TError,
+        {data: BodyType<WhatsappTemplatePreviewInput>},
+        TContext
+      > => {
+      return useMutation(getPreviewWhatsappTemplateMutationOptions(options));
+    }
+
+export const getUpdateWhatsappTemplateUrl = (id: string,) => {
+
+
+
+
+  return `/api/clinic/whatsapp/templates/${id}`
+}
+
+/**
+ * @summary Edit or activate a WhatsApp template
+ */
+export const updateWhatsappTemplate = async (id: string,
+    whatsappTemplateUpdate: WhatsappTemplateUpdate, options?: Parameters<typeof customFetch>[1]): Promise<WhatsappTemplate> => {
+
+  return customFetch<WhatsappTemplate>(getUpdateWhatsappTemplateUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(whatsappTemplateUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateWhatsappTemplateMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWhatsappTemplate>>, TError,{id: string;data: BodyType<WhatsappTemplateUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWhatsappTemplate>>, TError,{id: string;data: BodyType<WhatsappTemplateUpdate>}, TContext> => {
+
+const mutationKey = ['updateWhatsappTemplate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWhatsappTemplate>>, {id: string;data: BodyType<WhatsappTemplateUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateWhatsappTemplate(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWhatsappTemplateMutationResult = NonNullable<Awaited<ReturnType<typeof updateWhatsappTemplate>>>
+    export type UpdateWhatsappTemplateMutationBody = BodyType<WhatsappTemplateUpdate>
+    export type UpdateWhatsappTemplateMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Edit or activate a WhatsApp template
+ */
+export const useUpdateWhatsappTemplate = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWhatsappTemplate>>, TError,{id: string;data: BodyType<WhatsappTemplateUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateWhatsappTemplate>>,
+        TError,
+        {id: string;data: BodyType<WhatsappTemplateUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateWhatsappTemplateMutationOptions(options));
+    }
+
+export const getDeactivateWhatsappTemplateUrl = (id: string,) => {
+
+
+
+
+  return `/api/clinic/whatsapp/templates/${id}`
+}
+
+/**
+ * @summary Deactivate a WhatsApp template
+ */
+export const deactivateWhatsappTemplate = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<WhatsappTemplate> => {
+
+  return customFetch<WhatsappTemplate>(getDeactivateWhatsappTemplateUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeactivateWhatsappTemplateMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deactivateWhatsappTemplate>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deactivateWhatsappTemplate>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deactivateWhatsappTemplate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deactivateWhatsappTemplate>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deactivateWhatsappTemplate(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeactivateWhatsappTemplateMutationResult = NonNullable<Awaited<ReturnType<typeof deactivateWhatsappTemplate>>>
+
+    export type DeactivateWhatsappTemplateMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Deactivate a WhatsApp template
+ */
+export const useDeactivateWhatsappTemplate = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deactivateWhatsappTemplate>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deactivateWhatsappTemplate>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeactivateWhatsappTemplateMutationOptions(options));
+    }
+
+export const getTestWhatsappTemplateUrl = (id: string,) => {
+
+
+
+
+  return `/api/clinic/whatsapp/templates/${id}/test`
+}
+
+/**
+ * @summary Send a consented controlled template test
+ */
+export const testWhatsappTemplate = async (id: string,
+    whatsappTemplateTestInput: WhatsappTemplateTestInput, options?: Parameters<typeof customFetch>[1]): Promise<WhatsappOutbox> => {
+
+  return customFetch<WhatsappOutbox>(getTestWhatsappTemplateUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(whatsappTemplateTestInput)
+  }
+);}
+
+
+
+
+
+export const getTestWhatsappTemplateMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testWhatsappTemplate>>, TError,{id: string;data: BodyType<WhatsappTemplateTestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof testWhatsappTemplate>>, TError,{id: string;data: BodyType<WhatsappTemplateTestInput>}, TContext> => {
+
+const mutationKey = ['testWhatsappTemplate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof testWhatsappTemplate>>, {id: string;data: BodyType<WhatsappTemplateTestInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  testWhatsappTemplate(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TestWhatsappTemplateMutationResult = NonNullable<Awaited<ReturnType<typeof testWhatsappTemplate>>>
+    export type TestWhatsappTemplateMutationBody = BodyType<WhatsappTemplateTestInput>
+    export type TestWhatsappTemplateMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Send a consented controlled template test
+ */
+export const useTestWhatsappTemplate = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testWhatsappTemplate>>, TError,{id: string;data: BodyType<WhatsappTemplateTestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof testWhatsappTemplate>>,
+        TError,
+        {id: string;data: BodyType<WhatsappTemplateTestInput>},
+        TContext
+      > => {
+      return useMutation(getTestWhatsappTemplateMutationOptions(options));
+    }
+
 export const getListWhatsappOutboxUrl = () => {
 
 
@@ -1421,6 +2014,77 @@ export const useEnqueueWhatsappMessage = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getEnqueueWhatsappMessageMutationOptions(options));
+    }
+
+export const getProcessWhatsappOutboxUrl = (id: string,) => {
+
+
+
+
+  return `/api/clinic/whatsapp/outbox/${id}/process`
+}
+
+/**
+ * @summary Process one eligible WhatsApp outbox item
+ */
+export const processWhatsappOutbox = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<WhatsappOutbox> => {
+
+  return customFetch<WhatsappOutbox>(getProcessWhatsappOutboxUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getProcessWhatsappOutboxMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof processWhatsappOutbox>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof processWhatsappOutbox>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['processWhatsappOutbox'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof processWhatsappOutbox>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  processWhatsappOutbox(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ProcessWhatsappOutboxMutationResult = NonNullable<Awaited<ReturnType<typeof processWhatsappOutbox>>>
+
+    export type ProcessWhatsappOutboxMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Process one eligible WhatsApp outbox item
+ */
+export const useProcessWhatsappOutbox = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof processWhatsappOutbox>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof processWhatsappOutbox>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getProcessWhatsappOutboxMutationOptions(options));
     }
 
 export const getListClinicRecordsUrl = (table: 'appointments' | 'availability_slots' | 'clients' | 'package_templates' | 'patient_packages' | 'services' | 'session_exercises' | 'session_media' | 'session_plans' | 'user_roles',

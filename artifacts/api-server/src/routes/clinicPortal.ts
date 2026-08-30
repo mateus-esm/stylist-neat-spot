@@ -23,6 +23,7 @@ import {
   isAdminRole,
   isStaffRole,
 } from "../lib/clinicRole";
+import { enqueueAppointmentEvent } from "../lib/whatsapp";
 
 const router: IRouter = Router();
 router.use(requireClinicAuth);
@@ -169,6 +170,16 @@ router.post("/clinic/portal/appointments/:id/actions", async (req: Request, res:
       clinicId: context.clinicId, actorUserId: userId, action: `appointment.${parsed.data.action}`,
       resourceType: "appointment", resourceId: id, metadata: { idempotencyKey: parsed.data.idempotencyKey },
     });
+    try {
+      await enqueueAppointmentEvent(
+        context.clinicId,
+        id,
+        parsed.data.action === "confirm_presence" ? "appointment_confirmation" : "reschedule",
+        `${parsed.data.action}:${parsed.data.idempotencyKey}`,
+      );
+    } catch (error) {
+      req.log.warn({ err: error, appointmentId: id }, "Could not queue WhatsApp appointment event");
+    }
     return res.json(saved);
   } catch {
     return res.status(409).json({ error: "O agendamento mudou antes da confirmação; atualize a página" });

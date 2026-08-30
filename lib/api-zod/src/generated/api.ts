@@ -171,6 +171,104 @@ export const UpdateWhatsappConsentResponse = zod.record(zod.string(), zod.unknow
 
 
 /**
+ * @summary Read WhatsApp automation configuration and provider status
+ */
+export const GetWhatsappConfigResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Update WhatsApp automation and reminder windows
+ */
+export const updateWhatsappConfigBodyReminderHoursItemMax = 168;
+
+
+
+export const UpdateWhatsappConfigBody = zod.object({
+  "enabled": zod.boolean().optional(),
+  "reminderHours": zod.array(zod.number().min(1).max(updateWhatsappConfigBodyReminderHoursItemMax)).optional(),
+  "timezone": zod.string().optional()
+})
+
+export const UpdateWhatsappConfigResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary List clinic WhatsApp templates and allowed variables
+ */
+export const ListWhatsappTemplatesResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Create a WhatsApp template
+ */
+export const CreateWhatsappTemplateBody = zod.object({
+  "key": zod.string(),
+  "eventType": zod.enum(['invite', 'appointment_confirmation', 'appointment_reminder', 'reschedule']),
+  "label": zod.string(),
+  "body": zod.string(),
+  "active": zod.boolean().optional()
+})
+
+export const CreateWhatsappTemplateResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Render a safe template preview using non-clinical sample values
+ */
+export const PreviewWhatsappTemplateBody = zod.object({
+  "eventType": zod.enum(['invite', 'appointment_confirmation', 'appointment_reminder', 'reschedule']),
+  "body": zod.string()
+})
+
+export const PreviewWhatsappTemplateResponse = zod.object({
+  "text": zod.string()
+})
+
+
+/**
+ * @summary Edit or activate a WhatsApp template
+ */
+export const UpdateWhatsappTemplateParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateWhatsappTemplateBody = zod.object({
+  "key": zod.string().optional(),
+  "eventType": zod.enum(['invite', 'appointment_confirmation', 'appointment_reminder', 'reschedule']).optional(),
+  "label": zod.string().optional(),
+  "body": zod.string().optional(),
+  "active": zod.boolean().optional()
+})
+
+export const UpdateWhatsappTemplateResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Deactivate a WhatsApp template
+ */
+export const DeactivateWhatsappTemplateParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeactivateWhatsappTemplateResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Send a consented controlled template test
+ */
+export const TestWhatsappTemplateParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const TestWhatsappTemplateBody = zod.object({
+  "clientId": zod.string(),
+  "values": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+export const TestWhatsappTemplateResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
  * @summary List WhatsApp delivery history
  */
 export const ListWhatsappOutboxResponseItem = zod.record(zod.string(), zod.unknown())
@@ -182,13 +280,25 @@ export const ListWhatsappOutboxResponse = zod.array(ListWhatsappOutboxResponseIt
  */
 export const EnqueueWhatsappMessageBody = zod.object({
   "clientId": zod.string(),
-  "eventType": zod.string(),
+  "eventType": zod.enum(['invite', 'appointment_confirmation', 'appointment_reminder', 'reschedule']),
   "idempotencyKey": zod.string(),
   "payload": zod.record(zod.string(), zod.unknown()).optional(),
-  "fallbackText": zod.string()
+  "fallbackText": zod.string().optional(),
+  "scheduledAt": zod.coerce.date().optional(),
+  "templateKey": zod.string().optional()
 })
 
 export const EnqueueWhatsappMessageResponse = zod.record(zod.string(), zod.unknown())
+
+
+/**
+ * @summary Process one eligible WhatsApp outbox item
+ */
+export const ProcessWhatsappOutboxParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ProcessWhatsappOutboxResponse = zod.record(zod.string(), zod.unknown())
 
 
 /**

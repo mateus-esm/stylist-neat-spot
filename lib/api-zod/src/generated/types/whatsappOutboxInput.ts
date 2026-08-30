@@ -5,12 +5,15 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { WhatsappOutboxInputEventType } from './whatsappOutboxInputEventType';
 import type { WhatsappOutboxInputPayload } from './whatsappOutboxInputPayload';
 
 export interface WhatsappOutboxInput {
   clientId: string;
-  eventType: string;
+  eventType: WhatsappOutboxInputEventType;
   idempotencyKey: string;
   payload?: WhatsappOutboxInputPayload;
-  fallbackText: string;
+  fallbackText?: string;
+  scheduledAt?: Date;
+  templateKey?: string;
 }

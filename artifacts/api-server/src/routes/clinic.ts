@@ -59,6 +59,7 @@ import {
   type TableSlug,
 } from "../lib/clinicTables";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { enqueueAppointmentEvent, enqueueWhatsappEvent } from "../lib/whatsapp";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -557,7 +558,6 @@ router.get(
       res.status(403).json({ error: "No valid clinic role" });
       return;
     }
-
     // -----------------------------------------------------------------------
     // Patient scoping — all WHERE clauses use Drizzle camelCase properties
     // -----------------------------------------------------------------------
@@ -1336,6 +1336,26 @@ router.patch(
       res.status(404).json({ error: "Record not found" });
       return;
     }
+    if (tableName === "appointments") {
+      try {
+        const eventType = body["appointmentDate"] || body["appointmentTime"] || body["service"]
+          ? "reschedule" as const
+          : "appointment_confirmation" as const;
+        await enqueueAppointmentEvent(
+          context.clinicId,
+          updatedRows[0]["id"] as string,
+          eventType,
+          `generic-update:${JSON.stringify({
+            date: updatedRows[0]["appointmentDate"],
+            time: updatedRows[0]["appointmentTime"],
+            service: updatedRows[0]["service"],
+            status: updatedRows[0]["status"],
+          })}`,
+        );
+      } catch (error) {
+        req.log.warn({ err: error, appointmentId: id }, "Could not queue WhatsApp appointment update");
+      }
+    }
     res.json(rowToSnake(updatedRows[0], drizzleTable));
   },
 );
@@ -1544,6 +1564,20 @@ router.post(
       return;
     }
 
+    const context = await ensureClinicForUser(userId, role);
+    if (context) {
+      try {
+        await enqueueWhatsappEvent({
+          clinicId: context.clinicId,
+          clientId,
+          eventType: "invite",
+          idempotencyKey: `invite:${clientId}:${inviteId ?? email}`,
+          values: { inviteLink: "Use o link do convite recebido por e-mail para entrar no portal." },
+        });
+      } catch (error) {
+        req.log.warn({ err: error, clientId }, "Could not queue WhatsApp invitation");
+      }
+    }
     req.log.info({ clientId, email }, "Patient invitation created");
     res.status(201).json({ ok: true });
   },
@@ -1576,6 +1610,11 @@ router.post(
       res.status(403).json({ error: "Only patients can book slots" });
       return;
     }
+    const patientContext = await ensureClinicForUser(userId, role);
+    if (!patientContext) {
+      res.status(403).json({ error: "No clinic membership" });
+      return;
+    }
 
     const clientId = await getClientIdForPatient(userId);
     if (!clientId) {
@@ -1594,7 +1633,7 @@ router.post(
 
     // Load the patient's client to derive name + owning admin
     const [client] = await db
-      .select({ name: clientsTable.name, adminUserId: clientsTable.userId })
+    .select({ name: clientsTable.name, adminUserId: clientsTable.userId, clinicId: clientsTable.clinicId })
       .from(clientsTable)
       .where(eq(clientsTable.id, clientId))
       .limit(1);
@@ -1629,6 +1668,7 @@ router.post(
           .insert(appointmentsTable)
           .values({
             userId: slot.userId,
+            clinicId: client.clinicId ?? patientContext.clinicId,
             clientId,
             clientName: client.name,
             appointmentDate: slot.slotDate,
@@ -1671,6 +1711,13 @@ router.post(
         return;
       }
 
+      if (result.appointment.clinicId) {
+        try {
+          await enqueueAppointmentEvent(result.appointment.clinicId, result.appointment.id, "appointment_confirmation");
+        } catch (error) {
+          req.log.warn({ err: error, appointmentId: result.appointment.id }, "Could not queue WhatsApp booking confirmation");
+        }
+      }
       res.status(201).json({
         appointment: rowToSnake(result.appointment, appointmentsTable),
         slot: rowToSnake(result.slot, availabilitySlotsTable),

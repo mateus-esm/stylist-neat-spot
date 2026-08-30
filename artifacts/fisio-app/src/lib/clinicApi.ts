@@ -10,6 +10,8 @@ export type PortalData = {
   availableSlots: any[];
 };
 
+export type WhatsappEventType = "invite" | "appointment_confirmation" | "appointment_reminder" | "reschedule";
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
     credentials: "include",
@@ -40,6 +42,23 @@ export const clinicApi = {
     request<any>("/clinic/whatsapp/consent", { method: "POST", body: JSON.stringify(body) }),
   getConsent: (clientId?: string) =>
     request<any>(`/clinic/whatsapp/consent${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ""}`),
+  whatsappConfig: () => request<any>("/clinic/whatsapp/config"),
+  updateWhatsappConfig: (body: { enabled?: boolean; reminderHours?: number[]; timezone?: string }) =>
+    request<any>("/clinic/whatsapp/config", { method: "PATCH", body: JSON.stringify(body) }),
+  whatsappTemplates: () => request<{ templates: any[]; variables: Record<WhatsappEventType, string[]> }>("/clinic/whatsapp/templates"),
+  createWhatsappTemplate: (body: { key: string; eventType: WhatsappEventType; label: string; body: string; active?: boolean }) =>
+    request<any>("/clinic/whatsapp/templates", { method: "POST", body: JSON.stringify(body) }),
+  updateWhatsappTemplate: (id: string, body: Partial<{ key: string; eventType: WhatsappEventType; label: string; body: string; active: boolean }>) =>
+    request<any>(`/clinic/whatsapp/templates/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deactivateWhatsappTemplate: (id: string) =>
+    request<any>(`/clinic/whatsapp/templates/${id}`, { method: "DELETE" }),
+  previewWhatsappTemplate: (body: { eventType: WhatsappEventType; body: string }) =>
+    request<{ text: string }>("/clinic/whatsapp/templates/preview", { method: "POST", body: JSON.stringify(body) }),
+  testWhatsappTemplate: (id: string, body: { clientId: string; values?: Record<string, unknown> }) =>
+    request<any>(`/clinic/whatsapp/templates/${id}/test`, { method: "POST", body: JSON.stringify(body) }),
+  whatsappOutbox: () => request<any[]>("/clinic/whatsapp/outbox"),
+  processWhatsappOutbox: (id: string) =>
+    request<any>(`/clinic/whatsapp/outbox/${id}/process`, { method: "POST" }),
   members: () => request<any[]>("/clinic/members"),
   invitations: () => request<any[]>("/clinic/invitations/team"),
   inviteMember: (body: { email: string; role: "admin" | "physiotherapist" }) =>

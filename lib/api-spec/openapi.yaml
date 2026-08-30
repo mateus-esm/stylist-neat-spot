@@ -269,6 +269,136 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /clinic/whatsapp/config:
+    get:
+      operationId: getWhatsappConfig
+      tags: [clinic]
+      summary: Read WhatsApp automation configuration and provider status
+      responses:
+        "200":
+          description: Configuration without provider secrets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappConfig"
+    patch:
+      operationId: updateWhatsappConfig
+      tags: [clinic]
+      summary: Update WhatsApp automation and reminder windows
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatsappConfigUpdate"
+      responses:
+        "200":
+          description: Updated configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappSettings"
+  /clinic/whatsapp/templates:
+    get:
+      operationId: listWhatsappTemplates
+      tags: [clinic]
+      summary: List clinic WhatsApp templates and allowed variables
+      responses:
+        "200":
+          description: Templates and variables
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    post:
+      operationId: createWhatsappTemplate
+      tags: [clinic]
+      summary: Create a WhatsApp template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatsappTemplateInput"
+      responses:
+        "201":
+          description: Created template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappTemplate"
+  /clinic/whatsapp/templates/preview:
+    post:
+      operationId: previewWhatsappTemplate
+      tags: [clinic]
+      summary: Render a safe template preview using non-clinical sample values
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatsappTemplatePreviewInput"
+      responses:
+        "200":
+          description: Rendered preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappTemplatePreview"
+  /clinic/whatsapp/templates/{id}:
+    patch:
+      operationId: updateWhatsappTemplate
+      tags: [clinic]
+      summary: Edit or activate a WhatsApp template
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatsappTemplateUpdate"
+      responses:
+        "200":
+          description: Updated template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappTemplate"
+    delete:
+      operationId: deactivateWhatsappTemplate
+      tags: [clinic]
+      summary: Deactivate a WhatsApp template
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      responses:
+        "200":
+          description: Deactivated template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappTemplate"
+  /clinic/whatsapp/templates/{id}/test:
+    post:
+      operationId: testWhatsappTemplate
+      tags: [clinic]
+      summary: Send a consented controlled template test
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhatsappTemplateTestInput"
+      responses:
+        "200":
+          description: Test delivery state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappOutbox"
   /clinic/whatsapp/outbox:
     get:
       operationId: listWhatsappOutbox
@@ -292,8 +422,8 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/WhatsappOutboxInput"
+              schema:
+                $ref: "#/components/schemas/WhatsappOutboxInput"
       responses:
         "201":
           description: Queued message
@@ -302,6 +432,20 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /clinic/whatsapp/outbox/{id}/process:
+    post:
+      operationId: processWhatsappOutbox
+      tags: [clinic]
+      summary: Process one eligible WhatsApp outbox item
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      responses:
+        "200":
+          description: Current delivery state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappOutbox"
   /clinic/data/{table}:
     get:
       operationId: listClinicRecords
@@ -550,13 +694,69 @@ components:
         optedIn: { type: boolean }
     WhatsappOutboxInput:
       type: object
-      required: [clientId, eventType, idempotencyKey, fallbackText]
+      required: [clientId, eventType, idempotencyKey]
       properties:
         clientId: { type: string }
-        eventType: { type: string }
+        eventType: { type: string, enum: [invite, appointment_confirmation, appointment_reminder, reschedule] }
         idempotencyKey: { type: string }
         payload: { type: object, additionalProperties: true }
         fallbackText: { type: string }
+        scheduledAt: { type: string, format: date-time }
+        templateKey: { type: string }
+    WhatsappConfig:
+      type: object
+      additionalProperties: true
+    WhatsappConfigUpdate:
+      type: object
+      properties:
+        enabled: { type: boolean }
+        reminderHours:
+          type: array
+          items: { type: number, minimum: 1, maximum: 168 }
+        timezone: { type: string }
+    WhatsappSettings:
+      type: object
+      additionalProperties: true
+    WhatsappTemplate:
+      type: object
+      additionalProperties: true
+    WhatsappTemplateInput:
+      type: object
+      required: [key, eventType, label, body]
+      properties:
+        key: { type: string }
+        eventType: { type: string, enum: [invite, appointment_confirmation, appointment_reminder, reschedule] }
+        label: { type: string }
+        body: { type: string }
+        active: { type: boolean }
+    WhatsappTemplateUpdate:
+      type: object
+      properties:
+        key: { type: string }
+        eventType: { type: string, enum: [invite, appointment_confirmation, appointment_reminder, reschedule] }
+        label: { type: string }
+        body: { type: string }
+        active: { type: boolean }
+    WhatsappTemplatePreviewInput:
+      type: object
+      required: [eventType, body]
+      properties:
+        eventType: { type: string, enum: [invite, appointment_confirmation, appointment_reminder, reschedule] }
+        body: { type: string }
+    WhatsappTemplatePreview:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string }
+    WhatsappTemplateTestInput:
+      type: object
+      required: [clientId]
+      properties:
+        clientId: { type: string }
+        values: { type: object, additionalProperties: true }
+    WhatsappOutbox:
+      type: object
+      additionalProperties: true
     ClinicRecord:
       type: object
       additionalProperties: true

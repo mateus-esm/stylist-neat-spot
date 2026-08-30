@@ -117,15 +117,107 @@ export interface WhatsappConsentInput {
   optedIn: boolean;
 }
 
+export type WhatsappOutboxInputEventType = typeof WhatsappOutboxInputEventType[keyof typeof WhatsappOutboxInputEventType];
+
+
+export const WhatsappOutboxInputEventType = {
+  invite: 'invite',
+  appointment_confirmation: 'appointment_confirmation',
+  appointment_reminder: 'appointment_reminder',
+  reschedule: 'reschedule',
+} as const;
+
 export type WhatsappOutboxInputPayload = { [key: string]: unknown };
 
 export interface WhatsappOutboxInput {
   clientId: string;
-  eventType: string;
+  eventType: WhatsappOutboxInputEventType;
   idempotencyKey: string;
   payload?: WhatsappOutboxInputPayload;
-  fallbackText: string;
+  fallbackText?: string;
+  scheduledAt?: string;
+  templateKey?: string;
 }
+
+export interface WhatsappConfig { [key: string]: unknown }
+
+export interface WhatsappConfigUpdate {
+  enabled?: boolean;
+  /**
+     * @items.minimum 1
+     * @items.maximum 168
+     */
+  reminderHours?: number[];
+  timezone?: string;
+}
+
+export interface WhatsappSettings { [key: string]: unknown }
+
+export interface WhatsappTemplate { [key: string]: unknown }
+
+export type WhatsappTemplateInputEventType = typeof WhatsappTemplateInputEventType[keyof typeof WhatsappTemplateInputEventType];
+
+
+export const WhatsappTemplateInputEventType = {
+  invite: 'invite',
+  appointment_confirmation: 'appointment_confirmation',
+  appointment_reminder: 'appointment_reminder',
+  reschedule: 'reschedule',
+} as const;
+
+export interface WhatsappTemplateInput {
+  key: string;
+  eventType: WhatsappTemplateInputEventType;
+  label: string;
+  body: string;
+  active?: boolean;
+}
+
+export type WhatsappTemplateUpdateEventType = typeof WhatsappTemplateUpdateEventType[keyof typeof WhatsappTemplateUpdateEventType];
+
+
+export const WhatsappTemplateUpdateEventType = {
+  invite: 'invite',
+  appointment_confirmation: 'appointment_confirmation',
+  appointment_reminder: 'appointment_reminder',
+  reschedule: 'reschedule',
+} as const;
+
+export interface WhatsappTemplateUpdate {
+  key?: string;
+  eventType?: WhatsappTemplateUpdateEventType;
+  label?: string;
+  body?: string;
+  active?: boolean;
+}
+
+export type WhatsappTemplatePreviewInputEventType = typeof WhatsappTemplatePreviewInputEventType[keyof typeof WhatsappTemplatePreviewInputEventType];
+
+
+export const WhatsappTemplatePreviewInputEventType = {
+  invite: 'invite',
+  appointment_confirmation: 'appointment_confirmation',
+  appointment_reminder: 'appointment_reminder',
+  reschedule: 'reschedule',
+} as const;
+
+export interface WhatsappTemplatePreviewInput {
+  eventType: WhatsappTemplatePreviewInputEventType;
+  body: string;
+}
+
+export interface WhatsappTemplatePreview {
+  text: string;
+}
+
+export type WhatsappTemplateTestInputValues = { [key: string]: unknown };
+
+export interface WhatsappTemplateTestInput {
+  clientId: string;
+  values?: WhatsappTemplateTestInputValues;
+}
+
+export interface WhatsappOutbox { [key: string]: unknown }
 
 export interface ClinicRecord { [key: string]: unknown }
 
@@ -174,6 +266,8 @@ export type TransferClinicAppointment200 = { [key: string]: unknown };
 export type GetWhatsappConsent200 = { [key: string]: unknown };
 
 export type UpdateWhatsappConsent200 = { [key: string]: unknown };
+
+export type ListWhatsappTemplates200 = { [key: string]: unknown };
 
 export type ListWhatsappOutbox200Item = { [key: string]: unknown };
 
