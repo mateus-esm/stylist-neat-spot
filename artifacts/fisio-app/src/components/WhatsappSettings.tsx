@@ -216,8 +216,8 @@ const WhatsappSettings = () => {
           instanceName: result.instanceName ?? current?.instanceName ?? null,
           status: result.status ?? current?.status ?? "unknown",
           phoneNumber: result.phoneNumber ?? current?.phoneNumber ?? null,
-          qrCode: current?.qrCode ?? null,
-          qrExpiresAt: current?.qrExpiresAt ?? null,
+          qrCode: result.status === "awaiting_qr" ? current?.qrCode ?? null : null,
+          qrExpiresAt: result.status === "awaiting_qr" ? current?.qrExpiresAt ?? null : null,
         }));
       } catch {
         // The QR may be temporarily unavailable while the provider restarts.
