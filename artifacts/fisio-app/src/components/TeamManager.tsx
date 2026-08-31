@@ -21,6 +21,7 @@ const TeamManager = () => {
   const [inviteRole, setInviteRole] = useState<"physiotherapist" | "admin">("physiotherapist");
   const [selectedPatient, setSelectedPatient] = useState("");
   const [selectedPhysio, setSelectedPhysio] = useState("");
+  const [selectedAppointment, setSelectedAppointment] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -51,7 +52,6 @@ const TeamManager = () => {
     try { await clinicApi.updateMember(id, { status: "revoked" }); toast.success("Acesso revogado"); load(); }
     catch (error: any) { toast.error(error.message || "Não foi possível revogar"); }
   };
-  const [selectedAppointment, setSelectedAppointment] = useState("");
   const transfer = async () => {
     if (!selectedAppointment || !selectedPhysio || selectedPhysio === "__none__") return;
     setBusy(true);
