@@ -18,3 +18,14 @@ rendered text fields. Accept only the documented delivery states, make event
 inserts idempotent by clinic/provider-message/status, and persist only
 delivery metadata. Keep asynchronous processing disabled until a real instance
 and callback path have been verified.
+
+Instance lifecycle routes for create, connect, status, and logout are
+configurable environment values rather than assumed provider behavior.
+
+**Why:** The confirmed Whatsmiau contract covers sending and delivery callbacks,
+but does not fully document instance management endpoints; deployments may
+expose compatible routes under different paths.
+
+**How to apply:** Keep the clinic-scoped instance name in the database, never
+persist QR content, and fail clearly when a configured management route is not
+supported by the provider.
