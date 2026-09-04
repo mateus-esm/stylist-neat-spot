@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
-import soloLogo from "@/assets/solo-ventures-logo.png";
+import soloLogoDarkText from "@/assets/solo-ventures-logo-dark-text.png";
+import soloLogoLightText from "@/assets/solo-ventures-logo.png";
 import oneSymbol from "@/assets/one-symbol.png";
 import oneLockup from "@/assets/one-lockup.png";
 
@@ -64,7 +65,16 @@ export const BrandLogo = ({ className, size = "md" }: BrandLogoProps) => {
 export const SoloVenturesBadge = ({ className }: { className?: string }) => (
   <div className={cn("flex flex-col items-center gap-1.5 opacity-70", className)}>
     <span className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground">powered by</span>
-    <img src={soloLogo} alt="Solo Ventures" className="h-5 w-auto dark:invert dark:opacity-90" />
+    <img
+      src={soloLogoDarkText}
+      alt="Solo Ventures"
+      className="h-5 w-auto dark:hidden"
+    />
+    <img
+      src={soloLogoLightText}
+      alt="Solo Ventures"
+      className="hidden h-5 w-auto dark:block"
+    />
   </div>
 );
 
