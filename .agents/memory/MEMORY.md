@@ -2,3 +2,4 @@
 - [API Zod generated exports](api-zod-generated-exports.md) — keep explicit type exports because generated schemas and declarations can collide.
 - [Workspace build environment](workspace-build-env.md) — the canvas Vite build requires managed PORT and BASE_PATH values outside its workflow.
 - [Whatsmiau delivery contract](whatsmiau-delivery-contract.md) — v2 uses apikey + instance-scoped Evolution routes; webhook payloads must be reduced to delivery metadata.
+- [GitHub push connector limitation](github-push-connector.md) — authorized connector reads work, but Git object writes are blocked; use authenticated git transport for pushes.
