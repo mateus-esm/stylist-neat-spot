@@ -30,6 +30,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const clinicApi = {
   portal: () => request<PortalData>("/clinic/portal"),
   appointment: (id: string) => request<any>(`/clinic/portal/appointments/${id}`),
+  updatePatientAppointment: (id: string, body: {
+    status?: "em_andamento";
+    painScale?: number | null;
+    observations?: string | null;
+    patientNotes?: string | null;
+  }) => request<any>(`/clinic/data/appointments/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  }),
+  updatePatientExercise: (id: string, body: {
+    completedAt?: string | null;
+    performance?: "good" | "neutral" | "bad" | null;
+  }) => request<any>(`/clinic/data/session_exercises/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  }),
   appointmentAction: (id: string, body: {
     action: "confirm_presence" | "request_reschedule" | "request_cancel";
     confirmed: true;
@@ -60,6 +76,8 @@ export const clinicApi = {
     request<any>(`/clinic/whatsapp/templates/${id}`, { method: "DELETE" }),
   previewWhatsappTemplate: (body: { eventType: WhatsappEventType; body: string }) =>
     request<{ text: string }>("/clinic/whatsapp/templates/preview", { method: "POST", body: JSON.stringify(body) }),
+  createBooking: (body: { slotId: string }) =>
+    request<any>("/clinic/bookings", { method: "POST", body: JSON.stringify(body) }),
   testWhatsappTemplate: (id: string, body: { clientId: string; values?: Record<string, unknown> }) =>
     request<any>(`/clinic/whatsapp/templates/${id}/test`, { method: "POST", body: JSON.stringify(body) }),
   whatsappOutbox: () => request<any[]>("/clinic/whatsapp/outbox"),

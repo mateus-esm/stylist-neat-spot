@@ -12,15 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { BrandLogo } from "@/components/BrandLogo";
 import { CalendarPlus, Check, ChevronRight, FileText, HelpCircle, LogOut, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
-
-const statusLabel: Record<string, string> = {
-  solicitado: "Aguardando confirmação",
-  agendado: "Agendado",
-  presenca_confirmada: "Presença confirmada",
-  reagendamento_solicitado: "Reagendamento solicitado",
-  cancelamento_solicitado: "Cancelamento solicitado",
-  atendido: "Concluído",
-};
+import { appointmentStatusLabel } from "@/lib/statusLabels";
 
 const PatientPortal = () => {
   const { signOut } = useAuth();
@@ -28,19 +20,28 @@ const PatientPortal = () => {
   const location = useLocation();
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [requestOpen, setRequestOpen] = useState(false);
   const [confirming, setConfirming] = useState<{ id: string; action: "confirm_presence" | "request_reschedule" | "request_cancel" } | null>(null);
   const [whatsappOptedIn, setWhatsappOptedIn] = useState<boolean | null>(null);
 
   const load = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const portal = await clinicApi.portal();
       setData(portal);
-      const consent = await clinicApi.getConsent();
-      setWhatsappOptedIn(!!consent.optedIn);
+      try {
+        const consent = await clinicApi.getConsent();
+        setWhatsappOptedIn(!!consent.optedIn);
+      } catch {
+        // A consent service outage must not block access to the clinical portal.
+        setWhatsappOptedIn(null);
+      }
     }
-    catch (error: any) { toast.error(error.message || "Não foi possível carregar seu portal"); }
+    catch (error: any) {
+      setLoadError(error.message || "Não foi possível carregar seu portal");
+    }
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
@@ -77,6 +78,17 @@ const PatientPortal = () => {
   };
 
   if (loading) return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Carregando seu portal...</div>;
+  if (loadError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6 text-center">
+        <div className="max-w-sm space-y-3">
+          <h1 className="text-lg font-semibold">Não foi possível carregar o portal</h1>
+          <p className="text-sm text-muted-foreground">{loadError}</p>
+          <Button onClick={load} className="rounded-sm">Tentar novamente</Button>
+        </div>
+      </div>
+    );
+  }
   if (!data?.client) return <div className="p-6 text-center text-sm text-muted-foreground">Seu cadastro ainda não está vinculado a uma clínica.</div>;
 
   return (
@@ -113,7 +125,7 @@ const PatientPortal = () => {
             upcoming.map((a) => <Card key={a.id} className="rounded-sm"><CardContent className="flex items-center justify-between gap-3 p-3">
               <button className="min-w-0 flex-1 text-left" onClick={() => navigate(`/meu-app/sessao/${a.id}`)}>
                 <p className="text-sm font-semibold">{format(new Date(`${a.appointment_date}T12:00:00`), "EEE, dd MMM", { locale: ptBR })} · {a.appointment_time?.slice(0, 5)}</p>
-                <p className="text-xs text-muted-foreground">{a.service} · {statusLabel[a.status] ?? a.status}</p>
+                 <p className="text-xs text-muted-foreground">{a.service} · {appointmentStatusLabel(a.status)}</p>
               </button>
               <div className="flex gap-1"><Button variant="ghost" size="icon" title="Confirmar presença" onClick={() => setConfirming({ id: a.id, action: "confirm_presence" })}><Check className="h-4 w-4 text-primary" /></Button><Button variant="ghost" size="icon" title="Reagendar" onClick={() => setConfirming({ id: a.id, action: "request_reschedule" })}><ChevronRight className="h-4 w-4" /></Button><Button variant="ghost" size="icon" title="Solicitar cancelamento" onClick={() => setConfirming({ id: a.id, action: "request_cancel" })}><X className="h-4 w-4 text-destructive" /></Button></div>
             </CardContent></Card>)}
@@ -131,7 +143,7 @@ const PatientPortal = () => {
       </main>
 
       <Dialog open={!!confirming} onOpenChange={(open) => !open && setConfirming(null)}><DialogContent className="max-w-sm rounded-sm"><DialogHeader><DialogTitle>Confirmar ação</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">{confirming?.action === "confirm_presence" ? "Você confirma sua presença nesta sessão?" : confirming?.action === "request_cancel" ? "Deseja solicitar o cancelamento desta sessão?" : "Deseja solicitar um novo horário para esta sessão?"}</p><Button onClick={submitAction} className="w-full rounded-sm">Confirmar</Button></DialogContent></Dialog>
-      <Dialog open={requestOpen} onOpenChange={setRequestOpen}><DialogContent className="max-w-sm rounded-sm"><DialogHeader><DialogTitle>Solicitar sessão</DialogTitle></DialogHeader>{(data.availableSlots ?? []).length === 0 ? <p className="py-4 text-sm text-muted-foreground">Não há horários disponíveis no momento.</p> : <div className="space-y-2">{data.availableSlots.map((slot) => <button key={slot.id} onClick={async () => { try { const { createClinicBooking } = await import("@workspace/api-client-react"); await createClinicBooking({ slotId: slot.id }); toast.success("Horário solicitado"); setRequestOpen(false); load(); } catch (error: any) { toast.error(error.message || "Horário indisponível"); } }} className="w-full rounded-sm border border-border p-3 text-left hover:border-primary"><p className="text-sm font-semibold">{format(new Date(`${slot.slot_date}T12:00:00`), "EEE, dd MMM", { locale: ptBR })}</p><p className="text-xs text-muted-foreground">{slot.start_time?.slice(0, 5)} – {slot.end_time?.slice(0, 5)}</p></button>)}</div>}</DialogContent></Dialog>
+       <Dialog open={requestOpen} onOpenChange={setRequestOpen}><DialogContent className="max-w-sm rounded-sm"><DialogHeader><DialogTitle>Solicitar sessão</DialogTitle></DialogHeader>{(data.availableSlots ?? []).length === 0 ? <p className="py-4 text-sm text-muted-foreground">Não há horários disponíveis no momento.</p> : <div className="space-y-2">{data.availableSlots.map((slot) => <button key={slot.id} onClick={async () => { try { await clinicApi.createBooking({ slotId: slot.id }); toast.success("Horário solicitado"); setRequestOpen(false); await load(); } catch (error: any) { toast.error(error.message || "Horário indisponível"); } }} className="w-full rounded-sm border border-border p-3 text-left hover:border-primary"><p className="text-sm font-semibold">{format(new Date(`${slot.slot_date}T12:00:00`), "EEE, dd MMM", { locale: ptBR })}</p><p className="text-xs text-muted-foreground">{slot.start_time?.slice(0, 5)} – {slot.end_time?.slice(0, 5)}</p></button>)}</div>}</DialogContent></Dialog>
     </div>
   );
 };

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { TrendingUp, AlertCircle, CheckCircle2, Package } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
+import DataErrorState from "@/components/DataErrorState";
 
 const db = supabase as any;
 
@@ -26,15 +27,22 @@ const Financial = () => {
   const [customTo, setCustomTo] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [filterClient, setFilterClient] = useState<string>("all");
   const [filterService, setFilterService] = useState<string>("all");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const [{ data: a }, { data: p }, { data: c }] = await Promise.all([
+      setLoadError(null);
+      const [{ data: a, error: appointmentsError }, { data: p, error: packagesError }, { data: c, error: clientsError }] = await Promise.all([
         db.from("appointments").select("appointment_date, price, status, payment_status, package_id, client_id, service"),
         db.from("patient_packages").select("*"),
         db.from("clients").select("id, name").order("name"),
       ]);
+      const error = appointmentsError || packagesError || clientsError;
+      if (error) {
+        setLoadError(error.message || "Não foi possível carregar o financeiro.");
+        return;
+      }
       setAppts(a || []);
       setPackages(p || []);
       setClients(c || []);
@@ -179,6 +187,8 @@ const Financial = () => {
     });
   }, [range, completedAvulsos, paidPackagesInRange]);
 
+  if (loadError) return <DataErrorState message={loadError} onRetry={() => window.location.reload()} />;
+
   return (
     <div className="pb-24">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur-xl px-4 py-3">
@@ -263,7 +273,7 @@ const Financial = () => {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Card className="rounded-sm">
             <CardContent className="p-4">
               <div className="mb-2 flex items-center gap-1.5 text-warning">

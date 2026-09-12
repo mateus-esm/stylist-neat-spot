@@ -14,6 +14,8 @@ import PendingRequestsBanner from "@/components/PendingRequestsBanner";
 import { BrandLogo } from "@/components/BrandLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
+import { slotStatusLabel } from "@/lib/statusLabels";
+import DataErrorState from "@/components/DataErrorState";
 
 type View = "day" | "week" | "month";
 
@@ -47,6 +49,7 @@ const Index = () => {
   const [selected, setSelected] = useState<any>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const range = useMemo(() => {
     if (view === "day") return { start: anchorDate, end: anchorDate };
@@ -59,10 +62,11 @@ const Index = () => {
 
   const fetchAppointments = async () => {
     if (!user) return;
+    setLoadError(null);
     const from = format(range.start, "yyyy-MM-dd");
     const to = format(range.end, "yyyy-MM-dd");
 
-    const [{ data: appointmentRows }, { data: slotRows }] = await Promise.all([
+    const [{ data: appointmentRows, error: appointmentError }, { data: slotRows, error: slotError }] = await Promise.all([
       supabase
         .from("appointments")
         .select("*")
@@ -77,6 +81,10 @@ const Index = () => {
         .order("start_time"),
     ]);
 
+    if (appointmentError || slotError) {
+      setLoadError(appointmentError?.message || slotError?.message || "Não foi possível carregar a agenda.");
+      return;
+    }
     setAppointments(appointmentRows || []);
     setSlots(slotRows || []);
   };
@@ -109,6 +117,8 @@ const Index = () => {
     if (view === "week") return `${format(range.start, "dd MMM", { locale: ptBR })} – ${format(range.end, "dd MMM", { locale: ptBR })}`;
     return format(anchorDate, "MMMM yyyy", { locale: ptBR });
   }, [view, anchorDate, range]);
+
+  if (loadError) return <DataErrorState message={loadError} onRetry={fetchAppointments} />;
 
   return (
     <div className="pb-24">
@@ -286,7 +296,7 @@ const DayView = ({ date, appointments, slots, onSelect, onOpenAvailability }: an
               >
                 <div className="flex items-center justify-between gap-2 text-[11px] font-mono-data">
                   <span className="font-semibold tabular-nums">{slot.start_time?.slice(0, 5)} - {slot.end_time?.slice(0, 5)}</span>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider">{slot.status}</span>
+                   <span className="text-[9px] font-semibold uppercase tracking-wider">{slotStatusLabel(slot.status)}</span>
                 </div>
                 <p className="truncate text-xs">{slot.reason || (slot.status === "aberto" ? "Slot disponível" : slot.status === "reservado" ? "Horário reservado" : "Horário bloqueado")}</p>
               </div>
@@ -373,7 +383,7 @@ const WeekView = ({ startDate, appointments, slots, onSelect }: any) => {
                     >
                       <span className="font-semibold tabular-nums">{slot.start_time?.slice(0, 5)}</span>
                       <span className="flex-1 truncate">{slot.reason || "Slot"}</span>
-                      <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider">{slot.status}</span>
+                       <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider">{slotStatusLabel(slot.status)}</span>
                     </div>
                   ))}
                   {appointmentList.map((a: any) => {

@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { BrandLogo } from "@/components/BrandLogo";
 import { MessageCircle, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import DataErrorState from "@/components/DataErrorState";
 
 const db = supabase as any;
 
@@ -27,17 +28,25 @@ const Planning = () => {
   const [exercises, setExercises] = useState("");
   const [scheduling, setScheduling] = useState("");
   const [tips, setTips] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = async () => {
-    const [{ data: c }, { data: p }] = await Promise.all([
+    setLoadError(null);
+    const [{ data: c, error: clientsError }, { data: p, error: plansError }] = await Promise.all([
       db.from("clients").select("id, name, phone").order("name"),
       db.from("session_plans").select("*").order("week_start", { ascending: false }).limit(50),
     ]);
+    if (clientsError || plansError) {
+      setLoadError(clientsError?.message || plansError?.message || "Não foi possível carregar o planejamento.");
+      return;
+    }
     setClients(c || []);
     setPlans(p || []);
   };
 
   useEffect(() => { load(); }, []);
+
+  if (loadError) return <DataErrorState message={loadError} onRetry={load} />;
 
   const save = async () => {
     if (!user || !clientId || !title) { toast.error("Paciente e título são obrigatórios"); return; }
@@ -92,7 +101,7 @@ const Planning = () => {
         <Card className="rounded-sm">
           <CardContent className="p-4 space-y-3">
             <p className="text-sm font-semibold flex items-center gap-2"><Plus className="h-4 w-4 text-primary" /> Novo plano da semana</p>
-            <div className="grid grid-cols-2 gap-2">
+             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label className="text-xs">Paciente</Label>
                 <Select value={clientId} onValueChange={setClientId}>

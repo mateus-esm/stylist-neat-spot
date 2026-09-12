@@ -27,6 +27,10 @@ const Auth = () => {
         <BrandLogo size="lg" className="mb-10" />
 
         <div className="w-full">
+          <div className="mb-4 text-center">
+            <p className="text-lg font-semibold text-foreground">Acesso à One</p>
+            <p className="mt-1 text-sm text-muted-foreground">Entre para acompanhar sua jornada de cuidado</p>
+          </div>
           {isSignUp ? (
             <SignUp
               routing="path"
@@ -37,8 +41,8 @@ const Auth = () => {
                 theme: theme === "dark" ? dark : undefined,
                 elements: {
                   card: "bg-card/80 backdrop-blur-xl border border-border/60 shadow-elevated rounded-xl",
-                  headerTitle: "text-foreground font-display",
-                  headerSubtitle: "text-muted-foreground",
+                  headerTitle: "hidden",
+                  headerSubtitle: "hidden",
                   socialButtonsBlockButton: "bg-secondary/40 border-border hover:bg-secondary/60 text-foreground",
                   socialButtonsBlockButtonText: "text-foreground font-medium",
                   dividerLine: "bg-border",
@@ -63,8 +67,8 @@ const Auth = () => {
                 theme: theme === "dark" ? dark : undefined,
                 elements: {
                   card: "bg-card/80 backdrop-blur-xl border border-border/60 shadow-elevated rounded-xl",
-                  headerTitle: "text-foreground font-display",
-                  headerSubtitle: "text-muted-foreground",
+                  headerTitle: "hidden",
+                  headerSubtitle: "hidden",
                   socialButtonsBlockButton: "bg-secondary/40 border-border hover:bg-secondary/60 text-foreground",
                   socialButtonsBlockButtonText: "text-foreground font-medium",
                   dividerLine: "bg-border",

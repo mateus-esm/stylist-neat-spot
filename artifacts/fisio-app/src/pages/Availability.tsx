@@ -13,6 +13,8 @@ import { Plus, Trash2, CalendarClock, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/BrandLogo";
 import BulkSlotsDialog from "@/components/BulkSlotsDialog";
+import { slotStatusLabel } from "@/lib/statusLabels";
+import DataErrorState from "@/components/DataErrorState";
 
 const db = supabase as any;
 
@@ -26,14 +28,20 @@ const Availability = () => {
   const [status, setStatus] = useState<"aberto" | "bloqueado">("aberto");
   const [reason, setReason] = useState("");
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchSlots = async () => {
-    const { data } = await db
+    setLoadError(null);
+    const { data, error } = await db
       .from("availability_slots")
       .select("*")
       .gte("slot_date", today)
       .order("slot_date")
       .order("start_time");
+    if (error) {
+      setLoadError(error.message);
+      return;
+    }
     setSlots(data || []);
   };
 
@@ -68,6 +76,8 @@ const Availability = () => {
     return acc;
   }, {});
 
+  if (loadError) return <DataErrorState message={loadError} onRetry={fetchSlots} />;
+
   return (
     <div className="pb-24">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 px-4 py-3 backdrop-blur-xl">
@@ -87,7 +97,7 @@ const Availability = () => {
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <CalendarClock className="h-4 w-4 text-primary" /> Novo slot
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Data</Label>
                   <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="rounded-sm" />
@@ -136,7 +146,7 @@ const Availability = () => {
                     <p className="text-sm font-semibold tabular-nums">{s.start_time.slice(0,5)} - {s.end_time.slice(0,5)}</p>
                     {s.reason && <p className="text-xs text-muted-foreground">{s.reason}</p>}
                   </div>
-                  <Badge variant={s.status === "aberto" ? "default" : s.status === "reservado" ? "outline" : "secondary"} className="rounded-sm capitalize">{s.status}</Badge>
+                  <Badge variant={s.status === "aberto" ? "default" : s.status === "reservado" ? "outline" : "secondary"} className="rounded-sm">{slotStatusLabel(s.status)}</Badge>
                   <Button variant="ghost" size="icon" onClick={() => removeSlot(s.id)}><Trash2 className="h-4 w-4 text-muted-foreground" /></Button>
                 </div>
               ))}

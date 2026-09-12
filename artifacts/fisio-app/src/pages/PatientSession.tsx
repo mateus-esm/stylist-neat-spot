@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { supabase } from "@/integrations/supabase/client";
+import { clinicApi } from "@/lib/clinicApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,8 +14,7 @@ import { ChevronLeft, PlayCircle, Save, Smile, Meh, Frown } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import MediaTab from "@/components/MediaTab";
-
-const db = supabase as any;
+import { appointmentStatusLabel } from "@/lib/statusLabels";
 
 const perfOptions = [
   { value: "good", label: "Bom", Icon: Smile, cls: "text-success border-success/40" },
@@ -31,59 +30,107 @@ const PatientSession = () => {
   const [pain, setPain] = useState<string>("");
   const [obs, setObs] = useState("");
   const [diary, setDiary] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
-    if (!id) return;
-    const { data: a } = await db.from("appointments").select("*").eq("id", id).maybeSingle();
-    setAppointment(a);
-    if (a) {
-      setPain(a.pain_scale != null ? String(a.pain_scale) : "");
-      setObs(a.observations ?? "");
-      setDiary(a.patient_notes ?? "");
+    if (!id) {
+      setError("Sessão não encontrada.");
+      setLoading(false);
+      return;
     }
-    const { data: ex } = await db.from("session_exercises").select("*").eq("appointment_id", id).order("order_index");
-    setExercises(ex || []);
+    setLoading(true);
+    setError(null);
+    try {
+      const detail = await clinicApi.appointment(id);
+      const a = detail.appointment;
+      setAppointment(a);
+      setExercises(detail.exercises ?? []);
+      setPain(a?.pain_scale != null ? String(a.pain_scale) : "");
+      setObs(a?.observations ?? "");
+      setDiary(a?.patient_notes ?? "");
+      if (!a) setError("Sessão não encontrada.");
+    } catch (error: any) {
+      setAppointment(null);
+      setExercises([]);
+      setError(error.message || "Não foi possível carregar a sessão.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, [id]);
 
   const startSession = async () => {
-    const { error } = await db.from("appointments").update({ status: "em_andamento" }).eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Sessão iniciada");
-    load();
+    if (!id) return;
+    try {
+      await clinicApi.updatePatientAppointment(id, { status: "em_andamento" });
+      toast.success("Sessão iniciada");
+      await load();
+    } catch (error: any) {
+      toast.error(error.message || "Não foi possível iniciar a sessão");
+    }
   };
 
   const saveFeedback = async () => {
-    const { error } = await db.from("appointments").update({
-      pain_scale: pain === "" ? null : Number(pain),
-      observations: obs || null,
-      patient_notes: diary || null,
-    }).eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Registro salvo");
+    if (!id) return;
+    const painValue = pain === "" ? null : Number(pain);
+    if (painValue !== null && (!Number.isInteger(painValue) || painValue < 0 || painValue > 10)) {
+      toast.error("A dor deve ser um número entre 0 e 10");
+      return;
+    }
+    try {
+      await clinicApi.updatePatientAppointment(id, {
+        painScale: painValue,
+        observations: obs || null,
+        patientNotes: diary || null,
+      });
+      toast.success("Registro salvo");
+    } catch (error: any) {
+      toast.error(error.message || "Não foi possível salvar o registro");
+    }
   };
 
   const toggleExercise = async (ex: any) => {
     const completed_at = ex.completed_at ? null : new Date().toISOString();
-    const { error } = await db.from("session_exercises").update({ completed_at }).eq("id", ex.id);
-    if (error) { toast.error(error.message); return; }
-    setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, completed_at } : r)));
+    try {
+      await clinicApi.updatePatientExercise(ex.id, { completedAt: completed_at });
+      setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, completed_at } : r)));
+    } catch (error: any) {
+      toast.error(error.message || "Não foi possível atualizar o exercício");
+    }
   };
 
   const setPerformance = async (ex: any, performance: string) => {
     const next = ex.performance === performance ? null : performance;
-    const { error } = await db.from("session_exercises").update({ performance: next }).eq("id", ex.id);
-    if (error) { toast.error(error.message); return; }
-    setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, performance: next } : r)));
+    try {
+      await clinicApi.updatePatientExercise(ex.id, { performance: next as "good" | "neutral" | "bad" | null });
+      setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, performance: next } : r)));
+    } catch (error: any) {
+      toast.error(error.message || "Não foi possível registrar a avaliação");
+    }
   };
 
-  if (!appointment) return <div className="p-6">Carregando...</div>;
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Carregando sessão...</div>;
+  if (error || !appointment) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6 text-center">
+        <div className="max-w-sm space-y-3">
+          <h1 className="text-lg font-semibold">Sessão indisponível</h1>
+          <p className="text-sm text-muted-foreground">{error || "Não foi possível encontrar esta sessão."}</p>
+          <div className="flex justify-center gap-2">
+            <Button variant="outline" onClick={() => navigate("/meu-app")}>Voltar ao portal</Button>
+            <Button onClick={load}>Tentar novamente</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pb-24">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 px-4 py-3 backdrop-blur-xl">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-1 -ml-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/meu-app")} className="gap-1 -ml-2">
           <ChevronLeft className="h-4 w-4" /> Voltar
         </Button>
       </header>
@@ -94,7 +141,7 @@ const PatientSession = () => {
             {format(new Date(appointment.appointment_date + "T12:00:00"), "EEEE, dd 'de' MMMM", { locale: ptBR })} · {appointment.appointment_time?.slice(0,5)}
           </p>
           <h1 className="text-xl font-semibold">{appointment.service}</h1>
-          <Badge variant="outline" className="rounded-sm mt-1 capitalize">{appointment.status}</Badge>
+           <Badge variant="outline" className="rounded-sm mt-1">{appointmentStatusLabel(appointment.status)}</Badge>
         </div>
 
         {appointment.status === "agendado" && (

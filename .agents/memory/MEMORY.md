@@ -3,3 +3,4 @@
 - [Workspace build environment](workspace-build-env.md) — the canvas Vite build requires managed PORT and BASE_PATH values outside its workflow.
 - [Whatsmiau delivery contract](whatsmiau-delivery-contract.md) — v2 uses apikey + instance-scoped Evolution routes; webhook payloads must be reduced to delivery metadata.
 - [GitHub push connector limitation](github-push-connector.md) — authorized connector reads work, but Git object writes are blocked; use authenticated git transport for pushes.
+- [Clerk development instance](clerk-development-instance.md) — the auth UI’s Development mode badge comes from the configured Clerk instance, not frontend styling.

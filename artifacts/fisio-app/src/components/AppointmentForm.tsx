@@ -154,19 +154,22 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
       package_total: selectedPackage ? Number(selectedPackage.total_sessions || 0) : null,
     };
 
+    let succeeded = false;
     if (appointment) {
       const { error } = await db.from("appointments").update(data).eq("id", appointment.id);
       if (error) toast({ title: "Erro", description: error.message, variant: "destructive" });
-      else toast({ title: "Sessão atualizada" });
+      else { toast({ title: "Sessão atualizada" }); succeeded = true; }
     } else {
       const { error } = await db.from("appointments").insert(data);
       if (error) toast({ title: "Erro", description: error.message, variant: "destructive" });
-      else toast({ title: "Sessão agendada" });
+      else { toast({ title: "Sessão agendada" }); succeeded = true; }
     }
 
     setLoading(false);
-    onOpenChange(false);
-    onSuccess();
+    if (succeeded) {
+      onOpenChange(false);
+      onSuccess();
+    }
   };
 
   return (
@@ -199,7 +202,7 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
             <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} required className="rounded-sm" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Data</Label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="rounded-sm" />

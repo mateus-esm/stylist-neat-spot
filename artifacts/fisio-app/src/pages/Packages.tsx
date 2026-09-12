@@ -25,6 +25,8 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { Plus, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { forecastPackageEnd } from "@/lib/packageForecast";
+import { paymentStatusLabel } from "@/lib/statusLabels";
+import DataErrorState from "@/components/DataErrorState";
 
 const db = supabase as any;
 
@@ -65,14 +67,21 @@ const Packages = () => {
 
   const [forecasts, setForecasts] = useState<Record<string, Date | null>>({});
   const [closeTarget, setCloseTarget] = useState<Pkg | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = async () => {
-    const [{ data: pkg }, { data: cli }, { data: svc }, { data: tpl }] = await Promise.all([
+    setLoadError(null);
+    const [{ data: pkg, error: packagesError }, { data: cli, error: clientsError }, { data: svc, error: servicesError }, { data: tpl, error: templatesError }] = await Promise.all([
       db.from("patient_packages").select("*").order("created_at", { ascending: false }),
       db.from("clients").select("id, name").order("name"),
       db.from("services").select("name").eq("active", true).order("name"),
       db.from("package_templates").select("*").eq("active", true).order("name"),
     ]);
+    const error = packagesError || clientsError || servicesError || templatesError;
+    if (error) {
+      setLoadError(error.message || "Não foi possível carregar os pacotes.");
+      return;
+    }
     setPackages(pkg || []);
     setClients(cli || []);
     setServices(svc || []);
@@ -119,6 +128,8 @@ const Packages = () => {
     const pendente = ativos.filter((p) => p.payment_status === "pendente").reduce((s, p) => s + Number(p.price), 0);
     return { ativos: ativos.length, pagoMes, pendente };
   }, [packages]);
+
+  if (loadError) return <DataErrorState message={loadError} onRetry={load} />;
 
   const create = async () => {
     if (!user) return;
@@ -171,7 +182,7 @@ const Packages = () => {
       </header>
 
       <main className="mx-auto max-w-3xl space-y-4 px-4 pt-4">
-        <div className="grid grid-cols-3 gap-2">
+         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <Card className="rounded-sm"><CardContent className="p-3">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Em execução</p>
             <p className="text-2xl font-semibold">{totals.ativos}</p>
@@ -235,7 +246,7 @@ const Packages = () => {
                           variant={p.payment_status === "pago" ? "default" : "outline"}
                           className="rounded-sm text-[10px] capitalize"
                         >
-                          {p.payment_status}
+                           {paymentStatusLabel(p.payment_status)}
                         </Badge>
                       </div>
                     </div>

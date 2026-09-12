@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import ClientForm from "@/components/ClientForm";
 import { BrandLogo } from "@/components/BrandLogo";
 import { cn } from "@/lib/utils";
+import { appointmentStatusLabel, paymentStatusLabel } from "@/lib/statusLabels";
+import DataErrorState from "@/components/DataErrorState";
 
 const db = supabase as any;
 
@@ -44,19 +46,29 @@ const Patients = () => {
   const [packagePrice, setPackagePrice] = useState("");
   const [packagePaymentStatus, setPackagePaymentStatus] = useState<"pago" | "pendente">("pendente");
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchPatients = async () => {
     if (!user) return;
+    setLoadError(null);
 
     let query = db.from("clients").select("*").order("name");
     if (search) query = query.ilike("name", `%${search}%`);
-    const { data } = await query;
+    const { data, error: patientsError } = await query;
+    if (patientsError) {
+      setLoadError(patientsError.message);
+      return;
+    }
     setPatients(data || []);
 
-    const { data: appointments } = await db
+    const { data: appointments, error: appointmentsError } = await db
       .from("appointments")
       .select("client_id, appointment_date, status")
       .eq("status", "atendido");
+    if (appointmentsError) {
+      setLoadError(appointmentsError.message);
+      return;
+    }
 
     const nextStats: Record<string, { total: number; last: string | null }> = {};
     appointments?.forEach((appointment: any) => {
@@ -105,6 +117,8 @@ const Patients = () => {
   }, [user, search]);
 
   const activePackages = useMemo(() => packages.filter((pkg) => pkg.status === "ativo"), [packages]);
+
+  if (loadError) return <DataErrorState message={loadError} onRetry={fetchPatients} />;
 
   const saveAnamnesis = async () => {
     if (!selectedPatient) return;
@@ -303,7 +317,7 @@ const Patients = () => {
                       <Label>Plano</Label>
                       <Input value={packageName} onChange={(event) => setPackageName(event.target.value)} className="rounded-sm" />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="space-y-2">
                         <Label>Sessoes</Label>
                         <Input type="number" min="1" value={packageSessions} onChange={(event) => setPackageSessions(event.target.value)} className="rounded-sm" />
@@ -348,7 +362,7 @@ const Patients = () => {
                                 </p>
                               </div>
                               <Badge variant={pkg.payment_status === "pendente" ? "outline" : "default"} className="rounded-sm">
-                                {pkg.payment_status}
+                                 {paymentStatusLabel(pkg.payment_status)}
                               </Badge>
                             </div>
                             <div className="mt-3 h-2 rounded-sm bg-secondary">
@@ -383,7 +397,7 @@ const Patients = () => {
                               {appointment.observations && <p className="mt-1 text-xs text-muted-foreground">{appointment.observations}</p>}
                             </div>
                             <div className="text-right">
-                              <Badge variant="outline" className="rounded-sm">{appointment.status}</Badge>
+                               <Badge variant="outline" className="rounded-sm">{appointmentStatusLabel(appointment.status)}</Badge>
                               <p className="mt-1 text-xs font-semibold tabular-nums">R$ {Number(appointment.price || 0).toFixed(2)}</p>
                             </div>
                           </div>
