@@ -371,6 +371,12 @@ function providerConfig(instanceNameOverride?: string | null) {
 
 type WhatsappProviderMessage = Pick<typeof whatsappOutboxTable.$inferSelect, "clinicId" | "phone" | "fallbackText" | "idempotencyKey">;
 
+/** Digits only; Brazilian numbers without country code (10-11 digits) get 55. */
+export function normalizeWhatsappPhone(raw: string) {
+  const digits = raw.replace(/\D/g, "").replace(/^00/, "");
+  return digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
+}
+
 export function buildWhatsmiauRequest(message: WhatsappProviderMessage, instanceName?: string | null) {
   const config = providerConfig(instanceName);
   if (!message.phone) {
@@ -385,7 +391,7 @@ export function buildWhatsmiauRequest(message: WhatsappProviderMessage, instance
       "idempotency-key": message.idempotencyKey,
     },
     body: {
-      number: message.phone,
+      number: normalizeWhatsappPhone(message.phone),
       text: message.fallbackText,
     },
   };
