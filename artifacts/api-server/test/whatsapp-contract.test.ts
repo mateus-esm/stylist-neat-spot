@@ -24,9 +24,9 @@ afterEach(() => {
   }
 });
 
-describe("Whatsmiau v2 contract", () => {
+describe("Whatsmiau v1 contract", () => {
   it("uses the documented endpoint, apikey header, and non-clinical text-only body", () => {
-    process.env.WHATSMIAU_BASE_URL = "https://api.whatsmiau.dev/v2";
+    process.env.WHATSMIAU_BASE_URL = "https://whatsmiau.soloventures.com.br/v1";
     process.env.WHATSMIAU_API_TOKEN = "test-token";
     process.env.WHATSMIAU_INSTANCE_NAME = "Clinic01";
     delete process.env.WHATSMIAU_SEND_PATH;
@@ -37,7 +37,7 @@ describe("Whatsmiau v2 contract", () => {
       idempotencyKey: "appointment_reminder:abc:24",
     });
 
-    expect(request.url).toBe("https://api.whatsmiau.dev/v2/message/sendText/Clinic01");
+    expect(request.url).toBe("https://whatsmiau.soloventures.com.br/v1/message/sendText/Clinic01");
     expect(request.headers.apikey).toBe("test-token");
     expect(request.headers).not.toHaveProperty("authorization");
     expect(request.body).toEqual({
