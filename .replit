@@ -26,3 +26,6 @@ channel = "stable-25_05"
 
 [userenv.shared]
 CLINIC_INITIAL_ADMIN_EMAIL = "mateussmaia95@gmail.com"
+
+[userenv.production]
+CLINIC_PRODUCTION_OWNER_EMAIL = "mateus@soloenergia.com.br"

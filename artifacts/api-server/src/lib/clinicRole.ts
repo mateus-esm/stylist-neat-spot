@@ -22,6 +22,7 @@ import {
   patientInvitesTable,
   clinicsTable,
   clinicMembersTable,
+  clinicAuditEventsTable,
 } from "@workspace/db";
 
 export type ClinicRole = "owner" | "admin" | "physiotherapist" | "patient" | null;
@@ -126,6 +127,74 @@ export async function resolveOrBootstrapRole(
   userId: string,
 ): Promise<ClinicRole> {
   const existing = await getStoredRole(userId);
+  if (existing === "owner") {
+    const context = await ensureClinicForUser(userId, existing);
+    return context?.role ?? existing;
+  }
+
+  // A production-only, exact-email allowlist for granting clinic ownership.
+  // The Clerk email is fetched server-side; no client-supplied email is trusted.
+  const configuredOwnerEmail = process.env.CLINIC_PRODUCTION_OWNER_EMAIL
+    ?.trim()
+    .toLowerCase();
+  if (configuredOwnerEmail) {
+    const verifiedEmail = await getClerkPrimaryEmail(userId);
+    if (verifiedEmail === configuredOwnerEmail) {
+      const [priorGrant] = await db
+        .select({ id: clinicAuditEventsTable.id })
+        .from(clinicAuditEventsTable)
+        .where(and(
+          eq(clinicAuditEventsTable.actorUserId, userId),
+          eq(clinicAuditEventsTable.action, "owner.granted"),
+          eq(clinicAuditEventsTable.resourceType, "clinic_member"),
+        ))
+        .limit(1);
+      // The allowlist is a one-time bootstrap. Do not silently restore ownership
+      // if a later administrator intentionally changes this user's role.
+      if (priorGrant) return existing;
+
+      const clinics = await db.select({ id: clinicsTable.id }).from(clinicsTable).limit(2);
+      if (clinics.length !== 1) {
+        throw new Error("Production owner bootstrap requires exactly one configured clinic");
+      }
+      const clinicId = clinics[0].id;
+      const now = new Date();
+      const member = await db.transaction(async (tx) => {
+        const [upsertedMember] = await tx.insert(clinicMembersTable).values({
+          clinicId,
+          userId,
+          email: verifiedEmail,
+          role: "owner",
+          status: "active",
+          joinedAt: now,
+          revokedAt: null,
+        }).onConflictDoUpdate({
+          target: [clinicMembersTable.clinicId, clinicMembersTable.userId],
+          set: {
+            email: verifiedEmail,
+            role: "owner",
+            status: "active",
+            joinedAt: now,
+            revokedAt: null,
+          },
+        }).returning();
+
+        await tx.delete(userRolesTable).where(eq(userRolesTable.userId, userId));
+        await tx.insert(userRolesTable).values({ userId, role: "owner" });
+        await tx.insert(clinicAuditEventsTable).values({
+          clinicId,
+          actorUserId: userId,
+          action: "owner.granted",
+          resourceType: "clinic_member",
+          resourceId: upsertedMember.id,
+          metadata: { email: verifiedEmail, grantSource: "production_owner_allowlist" },
+        });
+        return upsertedMember;
+      });
+      return member ? "owner" : null;
+    }
+  }
+
   if (existing) {
     if (isStaffRole(existing)) {
       const context = await ensureClinicForUser(userId, existing);
