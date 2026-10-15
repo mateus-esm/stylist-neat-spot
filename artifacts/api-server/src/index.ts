@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startWhatsappWorker } from "./lib/whatsapp";
+import { importActivePatients } from "./migrations/importActivePatients";
 
 const rawPort = process.env["PORT"];
 
@@ -24,4 +25,5 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
   startWhatsappWorker();
+  importActivePatients().catch((error) => logger.error({ err: error }, "Active patient import failed"));
 });

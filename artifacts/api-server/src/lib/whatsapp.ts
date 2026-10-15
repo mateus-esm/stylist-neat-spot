@@ -21,6 +21,14 @@ export const WHATSAPP_VARIABLES: Record<WhatsappEventType, string[]> = {
   reschedule: ["patientName", "clinicName", "appointmentDate", "appointmentTime", "service", "confirmationLink"],
 };
 
+export function appBaseUrl() {
+  return (process.env.PUBLIC_APP_URL?.trim() || "https://app.onefisioterapia.com.br").replace(/\/+$/, "");
+}
+
+export function appLink(path = "/meu-app") {
+  return `${appBaseUrl()}${path}`;
+}
+
 const DEFAULT_TEMPLATES: Array<{
   key: string;
   eventType: WhatsappEventType;
@@ -31,27 +39,35 @@ const DEFAULT_TEMPLATES: Array<{
     key: "invite",
     eventType: "invite",
     label: "Convite para o portal",
-    body: "Olá, {{patientName}}. A {{clinicName}} enviou um convite para você acompanhar seus agendamentos. {{inviteLink}}",
+    body: "Olá, {{patientName}}! A {{clinicName}} liberou o seu acesso ao aplicativo, onde você acompanha suas sessões, seu plano e seus agendamentos. Acesse por aqui: {{inviteLink}}",
   },
   {
     key: "appointment_confirmation",
     eventType: "appointment_confirmation",
     label: "Confirmação de agendamento",
-    body: "Olá, {{patientName}}. Sua sessão na {{clinicName}} está marcada para {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. {{confirmationLink}}",
+    body: "Olá, {{patientName}}! Sua sessão na {{clinicName}} está agendada para {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. Veja os detalhes no aplicativo: {{confirmationLink}}",
   },
   {
     key: "appointment_reminder",
     eventType: "appointment_reminder",
     label: "Lembrete de sessão",
-    body: "Lembrete, {{patientName}}: sua sessão na {{clinicName}} será em {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. {{confirmationLink}}",
+    body: "Olá, {{patientName}}! Lembrete da sua sessão na {{clinicName}}: {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. Confirme ou peça alteração pelo aplicativo: {{confirmationLink}}",
   },
   {
     key: "reschedule",
     eventType: "reschedule",
     label: "Pedido de reagendamento",
-    body: "Olá, {{patientName}}. Recebemos seu pedido de reagendamento na {{clinicName}}. Consulte as opções seguras no portal: {{confirmationLink}}",
+    body: "Olá, {{patientName}}! Recebemos seu pedido de reagendamento na {{clinicName}}. Veja as opções de horário disponíveis no aplicativo: {{confirmationLink}}",
   },
 ];
+
+// Bodies shipped before the app link was added; rows still holding one of these are upgraded.
+const LEGACY_TEMPLATE_BODIES: Record<string, string[]> = {
+  invite: ["Olá, {{patientName}}. A {{clinicName}} enviou um convite para você acompanhar seus agendamentos. {{inviteLink}}"],
+  appointment_confirmation: ["Olá, {{patientName}}. Sua sessão na {{clinicName}} está marcada para {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. {{confirmationLink}}"],
+  appointment_reminder: ["Lembrete, {{patientName}}: sua sessão na {{clinicName}} será em {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. {{confirmationLink}}"],
+  reschedule: ["Olá, {{patientName}}. Recebemos seu pedido de reagendamento na {{clinicName}}. Consulte as opções seguras no portal: {{confirmationLink}}"],
+};
 
 export class WhatsappConfigurationError extends Error {}
 
@@ -108,11 +124,11 @@ export function previewValues(eventType: WhatsappEventType): Record<string, stri
   const values: Record<string, string> = {
     patientName: "Ana",
     clinicName: "Clínica exemplo",
-    inviteLink: "Acesse o portal pelo link enviado pela clínica.",
+    inviteLink: appLink(),
     appointmentDate: "10/01/2030",
     appointmentTime: "09:00",
     service: "Sessão de fisioterapia",
-    confirmationLink: "Acesse o portal para confirmar ou pedir alteração.",
+    confirmationLink: appLink(),
   };
   return Object.fromEntries(WHATSAPP_VARIABLES[eventType].map((key) => [key, values[key]]));
 }
@@ -135,6 +151,13 @@ export async function ensureWhatsappTemplates(clinicId: string) {
     }).onConflictDoNothing({
       target: [whatsappTemplatesTable.clinicId, whatsappTemplatesTable.key],
     });
+    for (const legacy of LEGACY_TEMPLATE_BODIES[template.key] ?? []) {
+      await db.update(whatsappTemplatesTable).set({ body: template.body }).where(and(
+        eq(whatsappTemplatesTable.clinicId, clinicId),
+        eq(whatsappTemplatesTable.key, template.key),
+        eq(whatsappTemplatesTable.body, legacy),
+      ));
+    }
   }
 }
 
@@ -216,11 +239,13 @@ export async function enqueueWhatsappEvent(input: EnqueueInput) {
         appointmentDate: appointment.appointmentDate,
         appointmentTime: appointment.appointmentTime.slice(0, 5),
         service: appointment.service,
-        confirmationLink: "Acesse o portal para confirmar ou pedir alteração.",
+        confirmationLink: appLink(`/meu-app/agenda/${appointmentId}`),
       };
     }
   }
   const values: Record<string, unknown> = {
+    inviteLink: appLink(),
+    confirmationLink: appLink(),
     ...input.values,
     ...appointmentValues,
     patientName: client.name,
@@ -279,7 +304,7 @@ export async function enqueueAppointmentEvent(
       appointmentDate: appointment.appointmentDate,
       appointmentTime: appointment.appointmentTime.slice(0, 5),
       service: appointment.service,
-      confirmationLink: "Acesse o portal para confirmar ou pedir alteração.",
+      confirmationLink: appLink(`/meu-app/agenda/${appointment.id}`),
     },
   });
 }
@@ -326,7 +351,7 @@ export async function enqueueDueWhatsappReminders(now = new Date()) {
             appointmentDate: appointment.appointmentDate,
             appointmentTime: appointment.appointmentTime.slice(0, 5),
             service: appointment.service,
-            confirmationLink: "Acesse o portal para confirmar ou pedir alteração.",
+            confirmationLink: appLink(`/meu-app/agenda/${appointment.id}`),
           },
           scheduledAt,
         });
@@ -341,7 +366,7 @@ export async function enqueueDueWhatsappReminders(now = new Date()) {
           appointmentDate: appointment.appointmentDate,
           appointmentTime: appointment.appointmentTime.slice(0, 5),
           service: appointment.service,
-          confirmationLink: "Acesse o portal para confirmar ou pedir alteração.",
+          confirmationLink: appLink(`/meu-app/agenda/${appointment.id}`),
         },
       });
       if (row?.createdAt && row.createdAt.getTime() >= now.getTime() - 1000) queued++;

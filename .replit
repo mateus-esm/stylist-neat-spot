@@ -30,3 +30,4 @@ WHATSMIAU_BASE_URL = "https://whatsmiau.soloventures.com.br/v1"
 
 [userenv.production]
 CLINIC_PRODUCTION_OWNER_EMAIL = "mateus@soloenergia.com.br"
+CLINIC_IMPORT_ACTIVE_PATIENTS = "true"

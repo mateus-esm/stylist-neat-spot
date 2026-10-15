@@ -1572,7 +1572,6 @@ router.post(
           clientId,
           eventType: "invite",
           idempotencyKey: `invite:${clientId}:${inviteId ?? email}`,
-          values: { inviteLink: "Use o link do convite recebido por e-mail para entrar no portal." },
         });
       } catch (error) {
         req.log.warn({ err: error, clientId }, "Could not queue WhatsApp invitation");
