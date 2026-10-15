@@ -7,7 +7,8 @@
     "completedSessions": 9,
     "price": 1100.0,
     "paymentStatus": "pago",
-    "notes": "LCA"
+    "notes": "LCA",
+    "paidAt": "2026-10-15"
   },
   {
     "name": "Nayara Pena",
@@ -17,7 +18,8 @@
     "completedSessions": 9,
     "price": 900.0,
     "paymentStatus": "pago",
-    "notes": "LCA"
+    "notes": "LCA",
+    "paidAt": "2026-10-15"
   },
   {
     "name": "Arnaud Amorin",
@@ -27,7 +29,8 @@
     "completedSessions": 9,
     "price": 900.0,
     "paymentStatus": "pago",
-    "notes": "LCA"
+    "notes": "LCA",
+    "paidAt": "2026-10-15"
   },
   {
     "name": "Ivana Alves",
@@ -37,7 +40,8 @@
     "completedSessions": 3,
     "price": 800.0,
     "paymentStatus": "pago",
-    "notes": "Dor crônica joelho"
+    "notes": "Dor crônica joelho",
+    "paidAt": "2026-10-15"
   },
   {
     "name": "Rodrigo Constante",
@@ -47,7 +51,8 @@
     "completedSessions": 4,
     "price": 800.0,
     "paymentStatus": "pago",
-    "notes": "Fratura"
+    "notes": "Fratura",
+    "paidAt": "2026-10-15"
   },
   {
     "name": "Patricia Oliveira",
@@ -57,7 +62,8 @@
     "completedSessions": 4,
     "price": 800.0,
     "paymentStatus": "pago",
-    "notes": "Coluna"
+    "notes": "Coluna",
+    "paidAt": "2026-10-15"
   },
   {
     "name": "Natali",
@@ -67,7 +73,8 @@
     "completedSessions": 4,
     "price": 1200.0,
     "paymentStatus": "pago",
-    "notes": "Coluna"
+    "notes": "Coluna",
+    "paidAt": "2026-10-15"
   },
   {
     "name": "Luiz Barros",
@@ -77,7 +84,8 @@
     "completedSessions": 8,
     "price": 1000.0,
     "paymentStatus": "pago",
-    "notes": "Coluna"
+    "notes": "Coluna",
+    "paidAt": "2026-10-15"
   },
   {
     "name": "Arthur Mesquita",
@@ -87,7 +95,8 @@
     "completedSessions": 3,
     "price": 600.0,
     "paymentStatus": "pago",
-    "notes": "Coluna"
+    "notes": "Coluna",
+    "paidAt": "2026-10-15"
   },
   {
     "name": "Raphael Pinheiro",
@@ -97,6 +106,7 @@
     "completedSessions": 4,
     "price": 1100.0,
     "paymentStatus": "pago",
-    "notes": "Coluna"
+    "notes": "Coluna",
+    "paidAt": "2026-10-15"
   }
 ]
