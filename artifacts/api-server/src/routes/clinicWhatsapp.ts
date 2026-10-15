@@ -424,7 +424,7 @@ router.post("/clinic/whatsapp/templates/:id/test", async (req: Request, res: Res
     eventType: template.eventType as WhatsappEventType,
     templateKey: template.key,
     idempotencyKey: `template_test:${template.id}:${Date.now()}`,
-    values: parsed.data.values,
+    values: { ...previewValues(template.eventType as WhatsappEventType), ...parsed.data.values },
     skipConsent: true,
   });
   if (!row) {
