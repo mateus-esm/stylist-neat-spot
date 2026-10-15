@@ -425,9 +425,10 @@ router.post("/clinic/whatsapp/templates/:id/test", async (req: Request, res: Res
     templateKey: template.key,
     idempotencyKey: `template_test:${template.id}:${Date.now()}`,
     values: parsed.data.values,
+    skipConsent: true,
   });
   if (!row) {
-    res.status(409).json({ error: "O paciente precisa ter consentimento e telefone válido para o teste" });
+    res.status(409).json({ error: "O paciente precisa ter um telefone cadastrado para o teste" });
     return;
   }
   const result = await processWhatsappMessage(row.id, admin.clinicId);

@@ -171,6 +171,8 @@ type EnqueueInput = {
   values?: Record<string, unknown>;
   scheduledAt?: Date;
   templateKey?: string;
+  /** Admin-triggered controlled tests skip the patient opt-in check. */
+  skipConsent?: boolean;
 };
 
 export async function enqueueWhatsappEvent(input: EnqueueInput) {
@@ -186,7 +188,7 @@ export async function enqueueWhatsappEvent(input: EnqueueInput) {
       eq(whatsappConsentsTable.clientId, input.clientId),
     )).limit(1);
   const phone = cleanValue(consent?.phone ?? client?.phone);
-  if (!client || !consent?.optedIn || !phone) return null;
+  if (!client || !phone || (!input.skipConsent && !consent?.optedIn)) return null;
 
   const [clinic] = await db.select({ name: clinicsTable.name }).from(clinicsTable)
     .where(eq(clinicsTable.id, input.clinicId)).limit(1);
