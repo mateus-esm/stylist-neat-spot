@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
-import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import {
   db,
   appointmentsTable,
@@ -12,6 +12,7 @@ import {
   patientPackagesTable,
   clientsTable,
   sessionExercisesTable,
+  sessionMediaTable,
   sessionPlansTable,
 } from "@workspace/db";
 import { z } from "zod";
@@ -24,6 +25,7 @@ import {
   isStaffRole,
 } from "../lib/clinicRole";
 import { enqueueAppointmentEvent } from "../lib/whatsapp";
+import { rowToSnake } from "../lib/clinicResponse";
 
 const router: IRouter = Router();
 router.use(requireClinicAuth);
@@ -105,14 +107,26 @@ router.get("/clinic/portal", async (req: Request, res: Response) => {
     clientIds.length ? db.select().from(sessionPlansTable).where(inArray(sessionPlansTable.clientId, clientIds)) : db.select().from(sessionPlansTable).where(eq(sessionPlansTable.userId, userId)),
     ids.length ? db.select().from(sessionExercisesTable).where(inArray(sessionExercisesTable.appointmentId, ids)) : Promise.resolve([]),
   ]);
-  const slotOwner = clients[0]?.assignedToUserId ?? clients[0]?.userId ?? appointments[0]?.userId;
+  // The booking endpoint accepts slots owned by the admin who manages the client.
+  const slotOwner = clients[0]?.userId;
   const slots = context.role === "patient" && slotOwner
     ? await db.select().from(availabilitySlotsTable).where(and(
       eq(availabilitySlotsTable.status, "aberto"),
       eq(availabilitySlotsTable.userId, slotOwner),
     ))
     : [];
-  return res.json({ clinicId: context.clinicId, role: context.role, client: clients[0] ?? null, clients, appointments, packages, plans, exercises, availableSlots: slots });
+  const clientRows = clients.map((row) => rowToSnake(row, clientsTable));
+  return res.json({
+    clinicId: context.clinicId,
+    role: context.role,
+    client: clientRows[0] ?? null,
+    clients: clientRows,
+    appointments: appointments.map((row) => rowToSnake(row, appointmentsTable)),
+    packages: packages.map((row) => rowToSnake(row, patientPackagesTable)),
+    plans: plans.map((row) => rowToSnake(row, sessionPlansTable)),
+    exercises: exercises.map((row) => rowToSnake(row, sessionExercisesTable)),
+    availableSlots: slots.map((row) => rowToSnake(row, availabilitySlotsTable)),
+  });
 });
 
 router.get("/clinic/portal/appointments/:id", async (req: Request, res: Response) => {
@@ -129,7 +143,23 @@ router.get("/clinic/portal/appointments/:id", async (req: Request, res: Response
     clinicId: context.clinicId, actorUserId: userId, action: "clinical_record.viewed",
     resourceType: "appointment", resourceId: id, metadata: {},
   });
-  return res.json({ appointment, exercises, plans });
+  return res.json({
+    appointment: rowToSnake(appointment, appointmentsTable),
+    exercises: exercises.map((row) => rowToSnake(row, sessionExercisesTable)),
+    plans: plans.map((row) => rowToSnake(row, sessionPlansTable)),
+  });
+});
+
+router.get("/clinic/portal/appointments/:id/media", async (req: Request, res: Response) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const { appointment } = await accessibleAppointment(userId, id);
+  if (!appointment) return res.status(404).json({ error: "Agendamento não encontrado" });
+  const media = await db.select().from(sessionMediaTable)
+    .where(eq(sessionMediaTable.appointmentId, appointment.id))
+    .orderBy(desc(sessionMediaTable.createdAt));
+  return res.json(media.map((row) => rowToSnake(row, sessionMediaTable)));
 });
 
 router.post("/clinic/portal/appointments/:id/actions", async (req: Request, res: Response) => {

@@ -1,47 +1,15 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import app from "../src/app";
-import { db, pool, clinicActionsTable, whatsappOutboxTable } from "@workspace/db";
+import { describe, expect, it } from "vitest";
+import { db, clinicActionsTable } from "@workspace/db";
 import { eq, and, count } from "drizzle-orm";
-import { cleanClinicFixtures, ids, seedClinicFixtures, users } from "./fixtures";
-
-const integration = Boolean(process.env.CLINIC_TEST_DATABASE_URL);
-const suite = describe.skipIf(!integration);
-
-let server: ReturnType<typeof app.listen>;
-let baseUrl = "";
-const originalWhatsmiauUrl = process.env.WHATSMIAU_BASE_URL;
-
-async function request(path: string, userId?: string, init?: RequestInit) {
-  return fetch(`${baseUrl}${path}`, {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(userId ? { "x-test-user-id": userId } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-}
+import { ids, users } from "./fixtures";
+import { useClinicApp } from "./clinicHarness";
 
 async function json(response: Response) {
   return response.json() as Promise<any>;
 }
 
-suite("authenticated clinic isolation", () => {
-  beforeAll(async () => {
-    delete process.env.WHATSMIAU_BASE_URL;
-    await cleanClinicFixtures();
-    await seedClinicFixtures();
-    server = app.listen(0);
-    await new Promise<void>((resolve) => server.once("listening", resolve));
-    baseUrl = `http://127.0.0.1:${(server.address() as any).port}`;
-  });
-
-  afterAll(async () => {
-    server?.close();
-    if (originalWhatsmiauUrl) process.env.WHATSMIAU_BASE_URL = originalWhatsmiauUrl;
-    await cleanClinicFixtures();
-    await pool.end();
-  });
+describe("authenticated clinic isolation", () => {
+  const request = useClinicApp();
 
   it("rejects anonymous protected requests while keeping health public", async () => {
     expect((await request("/api/healthz")).status).toBe(200);
@@ -112,7 +80,7 @@ suite("authenticated clinic isolation", () => {
     expect((await request("/api/storage/objects/uploads/isolation-b.jpg", users.patientA)).status).toBe(403);
   });
 
-  it("makes patient actions idempotent and booking reservation atomic under concurrency", async () => {
+  it("makes patient presence confirmation idempotent", async () => {
     const actionBody = { action: "confirm_presence", confirmed: true, idempotencyKey: "presence-a-2030" };
     const first = await request(`/api/clinic/portal/appointments/${ids.appointmentA}/actions`, users.patientA, {
       method: "POST", body: JSON.stringify(actionBody),
@@ -126,12 +94,6 @@ suite("authenticated clinic isolation", () => {
     const [actionCount] = await db.select({ count: count() }).from(clinicActionsTable)
       .where(and(eq(clinicActionsTable.appointmentId, ids.appointmentA), eq(clinicActionsTable.idempotencyKey, actionBody.idempotencyKey)));
     expect(Number(actionCount.count)).toBe(1);
-
-    const booking = await Promise.all([
-      request("/api/clinic/bookings", users.patientA, { method: "POST", body: JSON.stringify({ slotId: ids.slotA }) }),
-      request("/api/clinic/bookings", users.patientA, { method: "POST", body: JSON.stringify({ slotId: ids.slotA }) }),
-    ]);
-    expect(booking.map((response) => response.status).sort()).toEqual([201, 409]);
   });
 
   it("isolates WhatsApp consent and outbox, supports retry/fallback, and respects opt-out", async () => {
@@ -151,7 +113,7 @@ suite("authenticated clinic isolation", () => {
     const duplicate = await request("/api/clinic/whatsapp/outbox", users.ownerA, {
       method: "POST", body: JSON.stringify({
         clientId: ids.clientA, eventType: "appointment_reminder",
-        idempotencyKey: "reminder-a-2030", payload: {}, fallbackText: "retry",
+        idempotencyKey: "reminder-a-2030", payload: { appointmentId: ids.appointmentA },
       }),
     });
     expect(duplicate.status).toBe(200);

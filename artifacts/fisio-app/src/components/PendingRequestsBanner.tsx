@@ -27,12 +27,15 @@ const PendingRequestsBanner = ({ onChange }: Props) => {
 
   useEffect(() => {
     fetchRequests();
-    const channel = supabase
-      .channel("pending-requests")
-      .on("postgres_changes", { event: "*", schema: "public", table: "appointments" }, fetchRequests)
-      .subscribe();
+    // The compatibility client no longer has a realtime subscription.
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void fetchRequests();
+    };
+    const timer = window.setInterval(refreshWhenVisible, 30_000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
-      supabase.removeChannel(channel);
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, []);
 
@@ -44,11 +47,7 @@ const PendingRequestsBanner = ({ onChange }: Props) => {
       .eq("id", a.id);
     if (error) toast.error(error.message);
     else {
-      await supabase
-        .from("availability_slots")
-        .update({ status: "reservado", appointment_id: a.id })
-        .eq("slot_date", a.appointment_date)
-        .eq("start_time", a.appointment_time);
+      // Booking already reserved the exact slot. Do not modify other slots at the same time.
       toast.success("Agendamento aprovado");
     }
     setBusy(null);

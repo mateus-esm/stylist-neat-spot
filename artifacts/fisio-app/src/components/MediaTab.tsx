@@ -7,15 +7,15 @@ import { Label } from "@/components/ui/label";
 import { Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { finalizeAppointmentMedia } from "@workspace/api-client-react";
+import { clinicApi } from "@/lib/clinicApi";
 
-const db = supabase as any;
 const BUCKET = "session-media";
 
 interface Props {
   appointmentId: string;
 }
 
-// Server returns snake_case (via rowToSnake) for both list GET and finalize POST.
+// Both media endpoints return the same snake_case record.
 interface MediaItem {
   id: string;
   storage_path: string;
@@ -33,20 +33,19 @@ const MediaTab = ({ appointmentId }: Props) => {
   const [caption, setCaption] = useState("");
 
   const load = async () => {
-    const { data } = await db
-      .from("session_media")
-      .select("*")
-      .eq("appointment_id", appointmentId)
-      .order("created_at", { ascending: false });
-
-    const withUrls: MediaItem[] = [];
-    for (const m of (data || []) as MediaItem[]) {
-      const { data: signed } = await supabase.storage
-        .from(BUCKET)
-        .createSignedUrl(m.storage_path, 3600);
-      withUrls.push({ ...m, signedUrl: signed?.signedUrl });
+    try {
+      const data = await clinicApi.appointmentMedia<MediaItem>(appointmentId);
+      const withUrls = await Promise.all(data.map(async (item) => {
+        const { data: signed } = await supabase.storage
+          .from(BUCKET)
+          .createSignedUrl(item.storage_path, 3600);
+        return { ...item, signedUrl: signed?.signedUrl };
+      }));
+      setItems(withUrls);
+    } catch {
+      setItems([]);
+      toast.error("Não foi possível carregar as mídias.");
     }
-    setItems(withUrls);
   };
 
   useEffect(() => {
@@ -108,9 +107,12 @@ const MediaTab = ({ appointmentId }: Props) => {
 
   const remove = async (item: MediaItem) => {
     if (!confirm("Remover esta mídia?")) return;
-    await supabase.storage.from(BUCKET).remove([item.storage_path]);
-    await db.from("session_media").delete().eq("id", item.id);
-    load();
+    const { error } = await supabase.storage.from(BUCKET).remove([item.storage_path]);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setItems((current) => current.filter((media) => media.id !== item.id));
   };
 
   return (

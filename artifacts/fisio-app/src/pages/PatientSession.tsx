@@ -144,7 +144,7 @@ const PatientSession = () => {
            <Badge variant="outline" className="rounded-sm mt-1">{appointmentStatusLabel(appointment.status)}</Badge>
         </div>
 
-        {appointment.status === "agendado" && (
+        {["agendado", "confirmado"].includes(appointment.status) && (
           <Button onClick={startSession} className="w-full rounded-sm gap-2">
             <PlayCircle className="h-4 w-4" /> Cheguei / Iniciar sessão
           </Button>
