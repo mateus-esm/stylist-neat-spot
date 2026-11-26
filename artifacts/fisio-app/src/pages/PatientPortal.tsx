@@ -65,9 +65,9 @@ const PatientPortal = () => {
   }, [location.search]);
 
   const today = format(new Date(), "yyyy-MM-dd");
-  const isFuture = (a: any) => new Date(`${a.appointmentDate}T${a.appointmentTime}-03:00`) > new Date();
+  const isFuture = (a: any) => new Date(`${a.appointment_date}T${a.appointment_time}-03:00`) > new Date();
   const upcoming = useMemo(() => (data?.appointments ?? []).filter((a) =>
-    a.appointmentDate >= today && !["atendido", "cancelado", "faltou"].includes(a.status)
+    a.appointment_date >= today && !["atendido", "cancelado", "faltou"].includes(a.status)
   ), [data, today]);
   const linked = data?.appointments.find((a) => a.id === linkedId);
   const agenda = linkedId ? (linked ? [linked] : []) : upcoming;
@@ -82,7 +82,7 @@ const PatientPortal = () => {
       await clinicApi.appointmentAction(confirming.id, {
         action: confirming.action,
         confirmed: true,
-        idempotencyKey: `${confirming.action}:${confirming.id}:${data?.appointments.find((row) => row.id === confirming.id)?.updatedAt}`,
+        idempotencyKey: `${confirming.action}:${confirming.id}:${data?.appointments.find((row) => row.id === confirming.id)?.updated_at}`,
       });
       toast.success(confirming.action === "confirm_presence" ? "Presença confirmada" : confirming.action === "request_cancel" ? "Pedido de cancelamento enviado" : "Pedido de reagendamento enviado");
       setConfirming(null);
@@ -127,9 +127,9 @@ const PatientPortal = () => {
 
         {!linkedId && <section id="inicio" className="space-y-3">
           {activePackage && <Card className="rounded-sm"><CardContent className="space-y-3 p-4">
-            <div className="flex items-start justify-between"><div><p className="text-xs uppercase tracking-wider text-muted-foreground">Pacote ativo</p><p className="font-semibold">{activePackage.name}</p></div><Badge variant="outline" className="rounded-sm">{activePackage.completedSessions}/{activePackage.totalSessions}</Badge></div>
-            <Progress value={activePackage.totalSessions ? (activePackage.completedSessions / activePackage.totalSessions) * 100 : 0} className="h-2" />
-            <p className="text-xs text-muted-foreground">Saldo: {Math.max(0, Number(activePackage.totalSessions) - Number(activePackage.completedSessions))} sessões</p>
+            <div className="flex items-start justify-between"><div><p className="text-xs uppercase tracking-wider text-muted-foreground">Pacote ativo</p><p className="font-semibold">{activePackage.name}</p></div><Badge variant="outline" className="rounded-sm">{activePackage.completed_sessions}/{activePackage.total_sessions}</Badge></div>
+            <Progress value={activePackage.total_sessions ? (activePackage.completed_sessions / activePackage.total_sessions) * 100 : 0} className="h-2" />
+            <p className="text-xs text-muted-foreground">Saldo: {Math.max(0, Number(activePackage.total_sessions) - Number(activePackage.completed_sessions))} sessões</p>
           </CardContent></Card>}
           <Button onClick={() => setRequestOpen(true)} className="w-full rounded-sm gap-2"><CalendarPlus className="h-4 w-4" /> Solicitar sessão</Button>
         </section>}
@@ -139,7 +139,7 @@ const PatientPortal = () => {
           {agenda.length === 0 ? <Card className="rounded-sm border-dashed"><CardContent className="py-6 text-center text-sm text-muted-foreground">{linkedId ? "Esta sessão está indisponível para sua conta." : "Nenhuma sessão próxima."}</CardContent></Card> :
             agenda.map((a) => <Card key={a.id} className="rounded-sm"><CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
               <button className="min-w-0 flex-1 text-left" onClick={() => navigate(`/meu-app/sessao/${a.id}`)}>
-                <p className="text-sm font-semibold">{format(new Date(`${a.appointmentDate}T12:00:00`), "EEE, dd MMM", { locale: ptBR })} · {a.appointmentTime?.slice(0, 5)}</p>
+                <p className="text-sm font-semibold">{format(new Date(`${a.appointment_date}T12:00:00`), "EEE, dd MMM", { locale: ptBR })} · {a.appointment_time?.slice(0, 5)}</p>
                  <p className="text-xs text-muted-foreground">{a.service} · {appointmentStatusLabel(a.status)}</p>
               </button>
               <div className="flex flex-wrap gap-2">
@@ -155,7 +155,7 @@ const PatientPortal = () => {
         <section id="plano" className="space-y-3">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Plano e exercícios</p>
           {plans.length === 0 ? <Card className="rounded-sm border-dashed"><CardContent className="py-5 text-sm text-muted-foreground">Seu fisioterapeuta ainda não publicou um plano.</CardContent></Card> : plans.slice(0, 3).map((p) => <Card key={p.id} className="rounded-sm"><CardContent className="space-y-1 p-4"><p className="flex items-center gap-2 font-semibold"><FileText className="h-4 w-4 text-primary" />{p.title}</p>{p.content && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{p.content}</p>}{p.tips && <p className="text-xs text-muted-foreground"><b>Dicas:</b> {p.tips}</p>}</CardContent></Card>)}
-          {exercises.length > 0 && <Card className="rounded-sm"><CardContent className="p-4"><p className="mb-2 text-sm font-semibold">Exercícios acompanhados</p><p className="text-sm text-muted-foreground">{exercises.filter((e) => e.completedAt).length} de {exercises.length} concluídos</p></CardContent></Card>}
+          {exercises.length > 0 && <Card className="rounded-sm"><CardContent className="p-4"><p className="mb-2 text-sm font-semibold">Exercícios acompanhados</p><p className="text-sm text-muted-foreground">{exercises.filter((e) => e.completed_at).length} de {exercises.length} concluídos</p></CardContent></Card>}
         </section>
 
         <section id="ajuda" className="rounded-sm border border-border bg-card p-4"><p className="flex items-center gap-2 font-semibold"><HelpCircle className="h-4 w-4 text-primary" /> Precisa de ajuda?</p><p className="mt-1 text-sm text-muted-foreground">Use o WhatsApp da clínica para dúvidas sobre sua agenda ou plano. Não envie informações clínicas sensíveis por mensagem.</p></section>
@@ -164,7 +164,7 @@ const PatientPortal = () => {
       </main>
 
       <Dialog open={!!confirming} onOpenChange={(open) => !open && setConfirming(null)}><DialogContent className="max-w-sm rounded-sm"><DialogHeader><DialogTitle>Confirmar ação</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">{confirming?.action === "confirm_presence" ? "Você confirma sua presença nesta sessão?" : confirming?.action === "request_cancel" ? "Deseja solicitar o cancelamento desta sessão?" : "Deseja solicitar um novo horário para esta sessão?"}</p><Button onClick={submitAction} disabled={busy} className="w-full rounded-sm">Confirmar</Button></DialogContent></Dialog>
-       <Dialog open={requestOpen} onOpenChange={setRequestOpen}><DialogContent className="max-w-sm rounded-sm"><DialogHeader><DialogTitle>Solicitar sessão</DialogTitle></DialogHeader>{(data.availableSlots ?? []).length === 0 ? <p className="py-4 text-sm text-muted-foreground">Não há horários disponíveis no momento.</p> : <div className="space-y-2">{data.availableSlots.map((slot) => <button key={slot.id} disabled={busy} onClick={async () => { setBusy(true); try { await clinicApi.createBooking({ slotId: slot.id }); toast.success("Pedido enviado. Acompanhe a aprovação na agenda."); setRequestOpen(false); await load(); } catch (error: any) { toast.error(error.message || "Horário indisponível"); await load(); } finally { setBusy(false); } }} className="w-full rounded-sm border border-border p-3 text-left hover:border-primary"><p className="text-sm font-semibold">{format(new Date(`${slot.slotDate}T12:00:00`), "EEE, dd MMM", { locale: ptBR })}</p><p className="text-xs text-muted-foreground">{slot.startTime?.slice(0, 5)} – {slot.endTime?.slice(0, 5)}</p></button>)}</div>}</DialogContent></Dialog>
+       <Dialog open={requestOpen} onOpenChange={setRequestOpen}><DialogContent className="max-w-sm rounded-sm"><DialogHeader><DialogTitle>Solicitar sessão</DialogTitle></DialogHeader>{(data.availableSlots ?? []).length === 0 ? <p className="py-4 text-sm text-muted-foreground">Não há horários disponíveis no momento.</p> : <div className="space-y-2">{data.availableSlots.map((slot) => <button key={slot.id} disabled={busy} onClick={async () => { setBusy(true); try { await clinicApi.createBooking({ slotId: slot.id }); toast.success("Pedido enviado. Acompanhe a aprovação na agenda."); setRequestOpen(false); await load(); } catch (error: any) { toast.error(error.message || "Horário indisponível"); await load(); } finally { setBusy(false); } }} className="w-full rounded-sm border border-border p-3 text-left hover:border-primary"><p className="text-sm font-semibold">{format(new Date(`${slot.slot_date}T12:00:00`), "EEE, dd MMM", { locale: ptBR })}</p><p className="text-xs text-muted-foreground">{slot.start_time?.slice(0, 5)} – {slot.end_time?.slice(0, 5)}</p></button>)}</div>}</DialogContent></Dialog>
     </div>
   );
 };

@@ -38,6 +38,7 @@ export const clinicApi = {
   }),
   portal: () => request<PortalData>("/clinic/portal"),
   appointment: (id: string) => request<any>(`/clinic/portal/appointments/${id}`),
+  appointmentMedia: <T>(id: string) => request<T[]>(`/clinic/portal/appointments/${id}/media`),
   updatePatientAppointment: (id: string, body: {
     status?: "em_andamento";
     painScale?: number | null;

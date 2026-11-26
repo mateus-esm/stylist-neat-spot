@@ -19,7 +19,7 @@
  */
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
-import { eq, ne, ilike, gte, lte, and, or, inArray, asc, desc, isNull, getTableColumns } from "drizzle-orm";
+import { eq, ne, ilike, gte, lte, and, or, inArray, asc, desc, isNull, getTableColumns, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import {
   db,
@@ -60,6 +60,7 @@ import {
   type TableSlug,
 } from "../lib/clinicTables";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { rowToSnake } from "../lib/clinicResponse";
 import { completeVisit } from "../lib/completeVisit";
 import { enqueueBookingAlert, enqueueAppointmentEvent, enqueueWhatsappEvent } from "../lib/whatsapp";
 
@@ -109,17 +110,6 @@ function buildSnakeToCamelMap(table: any): Record<string, string> {
   return map;
 }
 
-/** Map of { drizzle_property_name → snake_col_name } for a Drizzle table. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildCamelToSnakeMap(table: any): Record<string, string> {
-  const cols = getTableColumns(table) as Record<string, { name: string }>;
-  const map: Record<string, string> = {};
-  for (const [camelKey, col] of Object.entries(cols)) {
-    map[camelKey] = col.name;
-  }
-  return map;
-}
-
 /**
  * Convert an incoming body record (keys may be snake_case OR camelCase) to an
  * object with the exact Drizzle camelCase property names for this table so it
@@ -141,26 +131,6 @@ function bodyToDb(
       snakeToCamel[k] ?? // already snake_case → map to camel
       (Object.prototype.hasOwnProperty.call(getTableColumns(table), k) ? k : undefined); // already camel
     if (camelKey !== undefined) out[camelKey] = v;
-  }
-  return out;
-}
-
-/**
- * Convert a Drizzle result row (camelCase keys) to a snake_case response
- * object so the legacy frontend receives the field names it expects.
- * Preserves null values; handles nested objects/arrays safely by only
- * converting top-level keys (Drizzle rows are always flat).
- */
-function rowToSnake(
-  row: Record<string, unknown>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  table: any,
-): Record<string, unknown> {
-  const camelToSnake = buildCamelToSnakeMap(table);
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) {
-    const snakeKey = camelToSnake[k] ?? k; // fall back to original key if not in map
-    out[snakeKey] = v;
   }
   return out;
 }
@@ -420,6 +390,10 @@ router.get(
     const role = await resolveOrBootstrapRole(userId);
     if (!role) {
       res.status(403).json({ error: "No role assigned" });
+      return;
+    }
+    if (!isAdminRole(role)) {
+      res.status(403).json({ error: "Fisioterapeutas e pacientes devem usar operações clínicas controladas" });
       return;
     }
     const context = await ensureClinicForUser(userId, role);
@@ -1024,7 +998,7 @@ router.patch(
 
         // ----------------------------------------------------------------
         // Status transition: patients may only check-in to their own
-        // appointment (agendado → em_andamento).  No other status change
+        // appointment (agendado/confirmado → em_andamento). No other status change
         // is permitted regardless of what the body contains.
         // ----------------------------------------------------------------
         if ("status" in dbBody) {
@@ -1070,11 +1044,14 @@ router.patch(
         const updatedRows = await db
           .update(tbl)
           .set(patientBody)
-          .where(and(eq(tbl["id"], id), eq(tbl["clientId"], clientId),
-            patientBody.status ? eq(tbl["status"], appt.status) : undefined))
+          .where(and(
+            eq(appointmentsTable.id, id),
+            eq(appointmentsTable.clientId, clientId),
+            "status" in patientBody ? eq(appointmentsTable.status, appt.status) : undefined,
+          ))
           .returning() as Record<string, unknown>[];
         if (!updatedRows[0]) {
-          res.status(404).json({ error: "Record not found" });
+          res.status(409).json({ error: "Appointment changed; reload before updating" });
           return;
         }
         res.json(rowToSnake(updatedRows[0], tbl));
@@ -1126,6 +1103,14 @@ router.patch(
         const exBody: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(dbBody)) {
           if (PATIENT_EX_ALLOWLIST.has(k)) exBody[k] = v;
+        }
+        if ("completedAt" in exBody && exBody.completedAt !== null) {
+          const timestamp = typeof exBody.completedAt === "string" ? new Date(exBody.completedAt) : null;
+          if (!timestamp || !Number.isFinite(timestamp.getTime())) {
+            res.status(400).json({ error: "completed_at must be a valid timestamp or null" });
+            return;
+          }
+          exBody.completedAt = timestamp;
         }
         if (Object.keys(exBody).length === 0) {
           res.status(400).json({
@@ -1413,6 +1398,10 @@ router.delete(
       res.status(403).json({ error: "This table cannot be modified through the generic API" });
       return;
     }
+    if (tableName === "session_media") {
+      res.status(403).json({ error: "Delete the media through the storage endpoint" });
+      return;
+    }
 
     const role = await resolveOrBootstrapRole(userId);
     if (!isAdminRole(role)) {
@@ -1434,7 +1423,7 @@ router.delete(
       whereClause = and(whereClause, eq(drizzleTable["userId"], userId))!;
     }
     whereClause = scopedToClinic(drizzleTable, whereClause, context.clinicId)!;
-    if (tableName === "session_exercises" || tableName === "session_media") {
+    if (tableName === "session_exercises") {
       const apptRows = await db
         .select({ id: appointmentsTable.id })
         .from(appointmentsTable)
@@ -1490,7 +1479,8 @@ router.post(
       res.status(400).json({ error: parsed.error.message });
       return;
     }
-    const { clientId, email } = parsed.data;
+    const { clientId } = parsed.data;
+    const email = parsed.data.email.trim().toLowerCase();
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       res.status(400).json({ error: "Invalid email address" });
@@ -1518,7 +1508,7 @@ router.post(
     const [existingInvite] = await db
       .select()
       .from(patientInvitesTable)
-      .where(eq(patientInvitesTable.email, email))
+      .where(eq(sql`lower(${patientInvitesTable.email})`, email))
       .limit(1);
 
     if (existingInvite) {
@@ -1950,6 +1940,36 @@ router.post(
     );
     if (!preAuth.ok) {
       res.status(preAuth.status).json({ error: preAuth.error });
+      return;
+    }
+
+    // Storage metadata validation can remove invalid files. Check ownership
+    // before touching the object; the transaction checks it again before linking.
+    const [pendingUpload] = await db.select().from(pendingUploadsTable)
+      .where(eq(pendingUploadsTable.storagePath, storagePath)).limit(1);
+    if (!pendingUpload) {
+      res.status(404).json({ error: "No pending upload found for this object" });
+      return;
+    }
+    if (pendingUpload.uploaderUserId !== userId) {
+      res.status(403).json({ error: "Pending upload does not belong to you" });
+      return;
+    }
+    if (pendingUpload.consumedAt) {
+      const [media] = await db.select().from(sessionMediaTable)
+        .where(and(
+          eq(sessionMediaTable.appointmentId, appointmentId),
+          eq(sessionMediaTable.storagePath, storagePath),
+        )).limit(1);
+      if (media) {
+        res.json(rowToSnake(media, sessionMediaTable));
+      } else {
+        res.status(409).json({ error: "Upload has already been finalized" });
+      }
+      return;
+    }
+    if (pendingUpload.expiresAt.getTime() <= Date.now()) {
+      res.status(410).json({ error: "Upload has expired" });
       return;
     }
 

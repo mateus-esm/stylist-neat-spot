@@ -46,9 +46,9 @@ const PatientSession = () => {
       const a = detail.appointment;
       setAppointment(a);
       setExercises(detail.exercises ?? []);
-      setPain(a?.painScale != null ? String(a.painScale) : "");
+      setPain(a?.pain_scale != null ? String(a.pain_scale) : "");
       setObs(a?.observations ?? "");
-      setDiary(a?.patientNotes ?? "");
+      setDiary(a?.patient_notes ?? "");
       if (!a) setError("Sessão não encontrada.");
     } catch (error: any) {
       setAppointment(null);
@@ -92,10 +92,10 @@ const PatientSession = () => {
   };
 
   const toggleExercise = async (ex: any) => {
-    const completedAt = ex.completedAt ? null : new Date().toISOString();
+    const completedAt = ex.completed_at ? null : new Date().toISOString();
     try {
       await clinicApi.updatePatientExercise(ex.id, { completedAt: completedAt });
-      setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, completedAt } : r)));
+      setExercises((rows) => rows.map((r) => (r.id === ex.id ? { ...r, completed_at: completedAt } : r)));
     } catch (error: any) {
       toast.error(error.message || "Não foi possível atualizar o exercício");
     }
@@ -138,7 +138,7 @@ const PatientSession = () => {
       <main className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
         <div>
           <p className="text-xs uppercase tracking-wider text-muted-foreground capitalize">
-            {format(new Date(appointment.appointmentDate + "T12:00:00"), "EEEE, dd 'de' MMMM", { locale: ptBR })} · {appointment.appointmentTime?.slice(0,5)}
+            {format(new Date(appointment.appointment_date + "T12:00:00"), "EEEE, dd 'de' MMMM", { locale: ptBR })} · {appointment.appointment_time?.slice(0,5)}
           </p>
           <h1 className="text-xl font-semibold">{appointment.service}</h1>
            <Badge variant="outline" className="rounded-sm mt-1">{appointmentStatusLabel(appointment.status)}</Badge>
@@ -160,14 +160,14 @@ const PatientSession = () => {
                 {exercises.map((ex) => (
                   <li key={ex.id} className="space-y-2 rounded-sm border border-border p-3">
                     <div className="flex items-start gap-3">
-                      <Checkbox checked={!!ex.completedAt} onCheckedChange={() => toggleExercise(ex)} className="mt-1" />
+                      <Checkbox checked={!!ex.completed_at} onCheckedChange={() => toggleExercise(ex)} className="mt-1" />
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium ${ex.completedAt ? "line-through text-muted-foreground" : ""}`}>{ex.name}</p>
+                        <p className={`text-sm font-medium ${ex.completed_at ? "line-through text-muted-foreground" : ""}`}>{ex.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {[ex.sets && `${ex.sets}x`, ex.reps, ex.load && `· ${ex.load}`, ex.restSeconds && `· ${ex.restSeconds}s desc`].filter(Boolean).join(" ")}
+                          {[ex.sets && `${ex.sets}x`, ex.reps, ex.load && `· ${ex.load}`, ex.rest_seconds && `· ${ex.rest_seconds}s desc`].filter(Boolean).join(" ")}
                         </p>
                         {ex.notes && <p className="text-xs text-muted-foreground mt-1">{ex.notes}</p>}
-                        {ex.videoUrl && <a href={ex.videoUrl} target="_blank" rel="noreferrer" className="text-xs text-primary">Ver vídeo</a>}
+                        {ex.video_url && <a href={ex.video_url} target="_blank" rel="noreferrer" className="text-xs text-primary">Ver vídeo</a>}
                       </div>
                     </div>
                     <div className="flex gap-2 pl-7">

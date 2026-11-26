@@ -14,7 +14,7 @@
  *        b. Inserts user_roles (patient)
  *        c. Marks patient_invites.consumed_at
  */
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, sql } from "drizzle-orm";
 import {
   db,
   userRolesTable,
@@ -256,30 +256,7 @@ export async function resolveOrBootstrapRole(
 export async function tryLinkPatientInvite(
   userId: string,
 ): Promise<ClinicRole> {
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey) return null;
-
-  // Fetch the user's email from Clerk REST API
-  let email: string | null = null;
-  try {
-    const resp = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-      headers: { Authorization: `Bearer ${secretKey}` },
-    });
-    if (resp.ok) {
-      const body = (await resp.json()) as {
-        email_addresses?: Array<{ email_address: string; id: string }>;
-        primary_email_address_id?: string;
-      };
-      const primary = body.email_addresses?.find(
-        (e) => e.id === body.primary_email_address_id,
-      );
-      email = primary?.email_address ?? body.email_addresses?.[0]?.email_address ?? null;
-    }
-  } catch {
-    // Network error — can't link now, return null
-    return null;
-  }
-
+  const email = await getClerkPrimaryEmail(userId);
   if (!email) return null;
 
   // Find an unconsumed invite for this email
@@ -288,7 +265,7 @@ export async function tryLinkPatientInvite(
     .from(patientInvitesTable)
     .where(
       and(
-        eq(patientInvitesTable.email, email),
+        eq(sql`lower(${patientInvitesTable.email})`, email),
         isNull(patientInvitesTable.consumedAt),
       ),
     )
@@ -304,8 +281,15 @@ export async function tryLinkPatientInvite(
     .limit(1);
 
   await db.transaction(async (tx) => {
-    // a) Link the client record
-    await tx
+    const now = new Date();
+    // Claim once. A concurrent accept must not grant an extra membership.
+    const [claimed] = await tx.update(patientInvitesTable)
+      .set({ consumedAt: now })
+      .where(and(eq(patientInvitesTable.id, invite.id), isNull(patientInvitesTable.consumedAt)))
+      .returning({ id: patientInvitesTable.id });
+    if (!claimed) return;
+
+    const [linked] = await tx
       .update(clientsTable)
       .set({
         authUserId: userId,
@@ -314,11 +298,12 @@ export async function tryLinkPatientInvite(
       .where(
         and(
           eq(clientsTable.id, invite.clientId),
-          isNull(clientsTable.authUserId), // only if not already linked
+          isNull(clientsTable.authUserId),
         ),
-      );
+      )
+      .returning({ id: clientsTable.id });
+    if (!linked) return;
 
-    // b) Assign patient role
     await tx
       .insert(userRolesTable)
       .values({ userId, role: "patient" })
@@ -331,18 +316,12 @@ export async function tryLinkPatientInvite(
         email,
         role: "patient",
         status: "active",
-        joinedAt: new Date(),
+        joinedAt: now,
       }).onConflictDoNothing();
     }
-
-    // c) Mark invite consumed
-    await tx
-      .update(patientInvitesTable)
-      .set({ consumedAt: new Date() })
-      .where(eq(patientInvitesTable.id, invite.id));
   });
 
-  // Verify the link actually happened (another concurrent request may have won)
+  // Return the existing role on a retry from the same account.
   return (await getStoredRole(userId)) ?? null;
 }
 

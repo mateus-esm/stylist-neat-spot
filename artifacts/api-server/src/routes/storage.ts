@@ -109,11 +109,8 @@ async function findMediaRow(
  */
 async function canReadMedia(
   userId: string,
-  rawPath: string,
+  media: typeof sessionMediaTable.$inferSelect,
 ): Promise<boolean> {
-  const media = await findMediaRow(rawPath);
-  if (!media) return false;
-
   const role = await getStoredRole(userId);
   const context = await ensureClinicForUser(userId, role);
 
@@ -135,14 +132,14 @@ async function canReadMedia(
   // Admin who owns the appointment
   if (appt.userId === userId) return true;
 
-  const [assigned] = await db.select({ id: clinicAssignmentsTable.id })
+  const [assigned] = appt.clientId ? await db.select({ id: clinicAssignmentsTable.id })
     .from(clinicAssignmentsTable)
     .where(and(
-      eq(clinicAssignmentsTable.clientId, appt.clientId ?? ""),
+      eq(clinicAssignmentsTable.clientId, appt.clientId),
       eq(clinicAssignmentsTable.physiotherapistUserId, userId),
       eq(clinicAssignmentsTable.status, "active"),
       context ? eq(clinicAssignmentsTable.clinicId, context.clinicId) : undefined,
-    )).limit(1);
+    )).limit(1) : [];
   if (assigned) return true;
 
   // Patient whose linked client matches
@@ -172,11 +169,8 @@ async function canReadMedia(
  */
 async function canDeleteMedia(
   userId: string,
-  rawPath: string,
+  media: typeof sessionMediaTable.$inferSelect,
 ): Promise<boolean> {
-  const media = await findMediaRow(rawPath);
-  if (!media) return false;
-
   const role = await getStoredRole(userId);
   const context = await ensureClinicForUser(userId, role);
 
@@ -198,14 +192,14 @@ async function canDeleteMedia(
   // Admin who owns the appointment may delete any media on it
   if (appt && appt.userId === userId) return true;
 
-  const [assigned] = await db.select({ id: clinicAssignmentsTable.id })
+  const [assigned] = appt.clientId ? await db.select({ id: clinicAssignmentsTable.id })
     .from(clinicAssignmentsTable)
     .where(and(
-      eq(clinicAssignmentsTable.clientId, (await db.select({ clientId: appointmentsTable.clientId }).from(appointmentsTable).where(eq(appointmentsTable.id, media.appointmentId)).limit(1))[0]?.clientId ?? ""),
+      eq(clinicAssignmentsTable.clientId, appt.clientId),
       eq(clinicAssignmentsTable.physiotherapistUserId, userId),
       eq(clinicAssignmentsTable.status, "active"),
       context ? eq(clinicAssignmentsTable.clinicId, context.clinicId) : undefined,
-    )).limit(1);
+    )).limit(1) : [];
   if (assigned) return true;
 
   return false;
@@ -352,10 +346,14 @@ router.get(
       const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
       const objectPath = `/objects/${wildcardPath}`;
 
-      // DB-based read authorization
-      const allowed = await canReadMedia(userId, objectPath);
-      if (!allowed) {
-        // GCS ACL owner fallback for objects not yet in session_media
+      // Object metadata cannot override authorization for finalized clinical media.
+      const media = await findMediaRow(objectPath);
+      if (media && !await canReadMedia(userId, media)) {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+      if (!media) {
+        // Legacy non-session objects still use object ACLs.
         try {
           const objectFile =
             await objectStorageService.getObjectEntityFile(objectPath);
@@ -380,6 +378,7 @@ router.get(
 
       res.status(response.status);
       response.headers.forEach((value, key) => res.setHeader(key, value));
+      res.setHeader("Cache-Control", "private, no-store");
 
       if (response.body) {
         const nodeStream = Readable.fromWeb(
@@ -418,10 +417,13 @@ router.delete(
       const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
       const objectPath = `/objects/${wildcardPath}`;
 
-      // DB-based delete authorization (stricter than read)
-      const allowed = await canDeleteMedia(userId, objectPath);
-      if (!allowed) {
-        // GCS ACL WRITE owner fallback
+      const media = await findMediaRow(objectPath);
+      if (media && !await canDeleteMedia(userId, media)) {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+      if (!media) {
+        // Legacy non-session objects still use object ACLs.
         try {
           const objectFile =
             await objectStorageService.getObjectEntityFile(objectPath);

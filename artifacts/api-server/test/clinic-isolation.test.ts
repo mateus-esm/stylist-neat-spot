@@ -1,48 +1,16 @@
 import { createServer } from "node:http";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import app from "../src/app";
-import { db, pool, clinicActionsTable, whatsappOutboxTable } from "@workspace/db";
+import { describe, expect, it } from "vitest";
+import { db, clinicActionsTable, whatsappOutboxTable } from "@workspace/db";
 import { eq, and, count } from "drizzle-orm";
-import { cleanClinicFixtures, ids, seedClinicFixtures, users } from "./fixtures";
-
-const integration = Boolean(process.env.CLINIC_TEST_DATABASE_URL);
-const suite = describe.skipIf(!integration);
-
-let server: ReturnType<typeof app.listen>;
-let baseUrl = "";
-const originalWhatsmiauUrl = process.env.WHATSMIAU_BASE_URL;
-
-async function request(path: string, userId?: string, init?: RequestInit) {
-  return fetch(`${baseUrl}${path}`, {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(userId ? { "x-test-user-id": userId } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-}
+import { ids, users } from "./fixtures";
+import { useClinicApp } from "./clinicHarness";
 
 async function json(response: Response) {
   return response.json() as Promise<any>;
 }
 
-suite("authenticated clinic isolation", () => {
-  beforeAll(async () => {
-    delete process.env.WHATSMIAU_BASE_URL;
-    await cleanClinicFixtures();
-    await seedClinicFixtures();
-    server = app.listen(0);
-    await new Promise<void>((resolve) => server.once("listening", resolve));
-    baseUrl = `http://127.0.0.1:${(server.address() as any).port}`;
-  });
-
-  afterAll(async () => {
-    server?.close();
-    if (originalWhatsmiauUrl) process.env.WHATSMIAU_BASE_URL = originalWhatsmiauUrl;
-    await cleanClinicFixtures();
-    await pool.end();
-  });
+describe("authenticated clinic isolation", () => {
+  const request = useClinicApp();
 
   it("rejects anonymous protected requests while keeping health public", async () => {
     expect((await request("/api/healthz")).status).toBe(200);
@@ -135,7 +103,7 @@ suite("authenticated clinic isolation", () => {
     expect((await request("/api/storage/objects/uploads/isolation-b.jpg", users.patientA)).status).toBe(403);
   });
 
-  it("makes patient actions idempotent and booking reservation atomic under concurrency", async () => {
+  it("makes patient presence confirmation idempotent", async () => {
     const actionBody = { action: "confirm_presence", confirmed: true, idempotencyKey: "presence-a-2030" };
     const first = await request(`/api/clinic/portal/appointments/${ids.appointmentA}/actions`, users.patientA, {
       method: "POST", body: JSON.stringify(actionBody),
@@ -149,7 +117,6 @@ suite("authenticated clinic isolation", () => {
     const [actionCount] = await db.select({ count: count() }).from(clinicActionsTable)
       .where(and(eq(clinicActionsTable.appointmentId, ids.appointmentA), eq(clinicActionsTable.idempotencyKey, actionBody.idempotencyKey)));
     expect(Number(actionCount.count)).toBe(1);
-
     await request("/api/clinic/whatsapp/config", users.ownerA, {
       method: "PATCH", body: JSON.stringify({ enabled: true, managerPhone: "+55 85 99999-0000" }),
     });
@@ -290,7 +257,7 @@ suite("authenticated clinic isolation", () => {
       expect(current.finishedAt).toBeTruthy();
       const reread = await json(await request("/api/clinic/portal", users.patientA));
       expect(reread.appointments.find((row: {id:string}) => row.id === first.id)).toMatchObject({
-        status: "atendido", packageSessionIndex: 5, painScale: 3, evolutionNotes: "Teste",
+        status: "atendido", package_session_index: 5, pain_scale: 3, evolution_notes: "Teste",
       });
       expect(reread.appointments.find((row: {id:string}) => row.id === excess.id).status).toBe("agendado");
     } finally {
@@ -341,6 +308,9 @@ suite("authenticated clinic isolation", () => {
   it("isolates WhatsApp consent and outbox, supports retry/fallback, and respects opt-out", async () => {
     expect((await request(`/api/clinic/whatsapp/consent?clientId=${ids.clientB}`, users.ownerA)).status).toBe(404);
     expect((await request("/api/clinic/whatsapp/outbox", users.ownerA)).status).toBe(200);
+    await request("/api/clinic/whatsapp/config", users.ownerA, {
+      method: "PATCH", body: JSON.stringify({ enabled: true, managerPhone: "5585999990000" }),
+    });
 
     const enqueue = await request("/api/clinic/whatsapp/outbox", users.ownerA, {
       method: "POST",
@@ -355,7 +325,7 @@ suite("authenticated clinic isolation", () => {
     const duplicate = await request("/api/clinic/whatsapp/outbox", users.ownerA, {
       method: "POST", body: JSON.stringify({
         clientId: ids.clientA, eventType: "appointment_reminder",
-        idempotencyKey: "reminder-a-2030", payload: {}, fallbackText: "retry",
+        idempotencyKey: "reminder-a-2030", payload: { appointmentId: ids.appointmentA },
       }),
     });
     expect(duplicate.status).toBe(200);
