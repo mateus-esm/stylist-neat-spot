@@ -105,6 +105,33 @@ export const ListClinicAuditEventsResponseItem = zod.record(zod.string(), zod.un
 export const ListClinicAuditEventsResponse = zod.array(ListClinicAuditEventsResponseItem)
 
 
+export const ListBookingRequestsQueryParams = zod.object({
+  "id": zod.coerce.string().optional()
+})
+
+export const ListBookingRequestsResponseItem = zod.object({
+  "id": zod.string(),
+  "clientName": zod.string(),
+  "appointmentDate": zod.string(),
+  "appointmentTime": zod.string(),
+  "status": zod.string()
+})
+export const ListBookingRequestsResponse = zod.array(ListBookingRequestsResponseItem)
+
+
+export const ReviewBookingRequestParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ReviewBookingRequestBody = zod.object({
+  "decision": zod.enum(['approve', 'decline'])
+})
+
+export const ReviewBookingRequestResponse = zod.object({
+  "id": zod.string()
+})
+
+
 /**
  * @summary Authenticated patient portal data
  */
@@ -199,6 +226,7 @@ export const updateWhatsappConfigBodyReminderHoursItemMax = 168;
 
 
 export const UpdateWhatsappConfigBody = zod.object({
+  "managerPhone": zod.string().nullish(),
   "enabled": zod.boolean().optional(),
   "reminderHours": zod.array(zod.number().min(1).max(updateWhatsappConfigBodyReminderHoursItemMax)).optional(),
   "timezone": zod.string().optional()

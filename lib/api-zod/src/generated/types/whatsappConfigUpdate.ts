@@ -7,6 +7,8 @@
  */
 
 export interface WhatsappConfigUpdate {
+  /** @nullable */
+  managerPhone?: string | null;
   enabled?: boolean;
   /**
      * @items.minimum 1

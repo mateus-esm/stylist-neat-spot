@@ -168,6 +168,55 @@ paths:
                 items:
                   type: object
                   additionalProperties: true
+  /clinic/booking-requests:
+    get:
+      operationId: listBookingRequests
+      tags: [clinic]
+      parameters:
+        - { name: id, in: query, schema: { type: string, description: Appointment UUID } }
+      responses:
+        "200":
+          description: Pending requests or the current status of one request in this clinic
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, clientName, appointmentDate, appointmentTime, status]
+                  properties:
+                    id: { type: string }
+                    clientName: { type: string }
+                    appointmentDate: { type: string }
+                    appointmentTime: { type: string }
+                    status: { type: string }
+  /clinic/booking-requests/{id}:
+    post:
+      operationId: reviewBookingRequest
+      tags: [clinic]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, description: Appointment UUID } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, decline] }
+      responses:
+        "200":
+          description: Booking reviewed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties:
+                  id: { type: string }
+        "409":
+          description: Request is no longer pending
   /clinic/portal:
     get:
       operationId: getPatientPortal
@@ -785,6 +834,7 @@ components:
     WhatsappConfigUpdate:
       type: object
       properties:
+        managerPhone: { type: [string, 'null'] }
         enabled: { type: boolean }
         reminderHours:
           type: array

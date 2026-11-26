@@ -50,6 +50,7 @@ const Availability = () => {
   const addSlot = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    if (end <= start) { toast.error("O fim precisa ser depois do início."); return; }
     const { error } = await db.from("availability_slots").insert({
       user_id: user.id,
       slot_date: date,
@@ -59,7 +60,7 @@ const Availability = () => {
       reason: reason || null,
     });
     if (error) { toast.error(error.message); return; }
-    toast.success(status === "bloqueado" ? "Horario bloqueado" : "Slot adicionado");
+    toast.success(status === "bloqueado" ? "Horário bloqueado" : "Horário adicionado");
     setReason("");
     fetchSlots();
   };
@@ -88,6 +89,12 @@ const Availability = () => {
       </header>
 
       <main className="mx-auto max-w-2xl space-y-4 px-4 pt-4">
+        <Button variant="outline" className="w-full" onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(`${window.location.origin}/meu-app?agendar=1`);
+            toast.success("Link copiado para compartilhar com os pacientes");
+          } catch { toast.error("Não foi possível copiar o link."); }
+        }}>Copiar link de agendamento</Button>
         <Button onClick={() => setBulkOpen(true)} variant="outline" className="w-full rounded-sm gap-2">
           <Layers className="h-4 w-4" /> Abrir horários em lote
         </Button>
@@ -95,7 +102,7 @@ const Availability = () => {
           <CardContent className="p-4">
             <form onSubmit={addSlot} className="space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold">
-                <CalendarClock className="h-4 w-4 text-primary" /> Novo slot
+                <CalendarClock className="h-4 w-4 text-primary" /> Novo horário
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <div className="space-y-1">
@@ -133,7 +140,7 @@ const Availability = () => {
         </Card>
 
         {Object.keys(grouped).length === 0 ? (
-          <Card className="rounded-sm border-dashed"><CardContent className="py-10 text-center text-sm text-muted-foreground">Sem horarios cadastrados.</CardContent></Card>
+          <Card className="rounded-sm border-dashed"><CardContent className="py-10 text-center text-sm text-muted-foreground">Nenhum horário cadastrado.</CardContent></Card>
         ) : (
           (Object.entries(grouped) as [string, any[]][]).map(([day, daySlots]) => (
             <div key={day} className="space-y-2">

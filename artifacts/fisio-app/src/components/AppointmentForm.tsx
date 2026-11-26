@@ -47,7 +47,7 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
   const [time, setTime] = useState("");
   const [price, setPrice] = useState("");
   const [date, setDate] = useState(selectedDate);
-  const [duration, setDuration] = useState("50");
+  const [duration, setDuration] = useState("60");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -63,7 +63,7 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
       setServiceChoice(OTHER);
       setPrice(String(appointment.price));
       setDate(appointment.appointment_date);
-      setDuration(String(appointment.duration_min || 50));
+      setDuration(String(appointment.duration_min || 60));
       if (appointment.client_id) fetchPackages(appointment.client_id);
     } else {
       setClientId("");
@@ -74,7 +74,7 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
       setServiceText("");
       setPrice("");
       setDate(selectedDate);
-      setDuration("50");
+      setDuration("60");
       setPackages([]);
     }
   }, [open, appointment, user, selectedDate]);
@@ -135,6 +135,7 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
       toast({ title: "Informe o serviço", variant: "destructive" });
       return;
     }
+    if (!clientName.trim()) { toast({ title: "Selecione ou informe o paciente", variant: "destructive" }); return; }
     setLoading(true);
 
     const nextPackageIndex = selectedPackage ? Number(selectedPackage.completed_sessions || 0) + 1 : null;
@@ -148,7 +149,7 @@ const AppointmentForm = ({ open, onOpenChange, onSuccess, appointment, selectedD
       service: finalService,
       price: linkedToPackage ? 0 : (parseFloat(price) || 0),
       payment_status: linkedToPackage ? "pago" : (appointment?.payment_status || "pendente"),
-      duration_min: parseInt(duration) || 50,
+      duration_min: parseInt(duration) || 60,
       package_id: selectedPackage?.id || null,
       package_session_index: nextPackageIndex,
       package_total: selectedPackage ? Number(selectedPackage.total_sessions || 0) : null,

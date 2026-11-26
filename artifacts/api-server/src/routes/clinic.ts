@@ -52,6 +52,7 @@ import {
   ensureClinicForUser,
   tryLinkPatientInvite,
   getClientIdForPatient,
+  clinicalFields,
   isAdminRole,
 } from "../lib/clinicRole";
 import {
@@ -59,7 +60,8 @@ import {
   type TableSlug,
 } from "../lib/clinicTables";
 import { ObjectStorageService } from "../lib/objectStorage";
-import { enqueueAppointmentEvent, enqueueWhatsappEvent } from "../lib/whatsapp";
+import { completeVisit } from "../lib/completeVisit";
+import { enqueueBookingAlert, enqueueAppointmentEvent, enqueueWhatsappEvent } from "../lib/whatsapp";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -359,13 +361,14 @@ async function execQuery(
   single: boolean,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   table: any,
+  clinicalOnly = false,
 ): Promise<unknown> {
   let q = baseQuery;
   if (orderClauses.length > 0) q = q.orderBy(...orderClauses);
   if (limit) q = q.limit(limit);
   const rows: unknown[] = await q;
   const converted = (rows as Record<string, unknown>[]).map((r) =>
-    rowToSnake(r, table),
+    rowToSnake(clinicalOnly ? clinicalFields(r) : r, table),
   );
   if (single) return converted[0] ?? null;
   return converted;
@@ -417,10 +420,6 @@ router.get(
     const role = await resolveOrBootstrapRole(userId);
     if (!role) {
       res.status(403).json({ error: "No role assigned" });
-      return;
-    }
-    if (!isAdminRole(role)) {
-      res.status(403).json({ error: "Fisioterapeutas e pacientes devem usar operações clínicas controladas" });
       return;
     }
     const context = await ensureClinicForUser(userId, role);
@@ -516,6 +515,7 @@ router.get(
         .from(clinicAssignmentsTable)
         .where(and(
           eq(clinicAssignmentsTable.physiotherapistUserId, userId),
+          eq(clinicAssignmentsTable.clinicId, context.clinicId),
           eq(clinicAssignmentsTable.status, "active"),
         ));
       const assignedClientIds = assignmentRows.map((row) => row.clientId);
@@ -528,7 +528,7 @@ router.get(
         const scopeWhere = inArray(scopedColumn, assignedClientIds);
         const combinedWhere = callerWhere ? and(scopeWhere, callerWhere) : scopeWhere;
         const q = db.select().from(drizzleTable).where(combinedWhere);
-        res.json(await execQuery(q, orderClauses, limit, single, drizzleTable));
+        res.json(await execQuery(q, orderClauses, limit, single, drizzleTable, true));
         return;
       }
       if (tableName === "session_exercises" || tableName === "session_media") {
@@ -541,13 +541,13 @@ router.get(
         }
         const scopeWhere = inArray(drizzleTable["appointmentId"], appointmentIds);
         const combinedWhere = callerWhere ? and(scopeWhere, callerWhere) : scopeWhere;
-        res.json(await execQuery(db.select().from(drizzleTable).where(combinedWhere), orderClauses, limit, single, drizzleTable));
+        res.json(await execQuery(db.select().from(drizzleTable).where(combinedWhere), orderClauses, limit, single, drizzleTable, true));
         return;
       }
       if (tableName === "availability_slots" || tableName === "services") {
         const scopeWhere = eq(drizzleTable["userId"], userId);
         const combinedWhere = callerWhere ? and(scopeWhere, callerWhere) : scopeWhere;
-        res.json(await execQuery(db.select().from(drizzleTable).where(combinedWhere), orderClauses, limit, single, drizzleTable));
+        res.json(await execQuery(db.select().from(drizzleTable).where(combinedWhere), orderClauses, limit, single, drizzleTable, true));
         return;
       }
       res.status(403).json({ error: "Recurso não disponível para fisioterapeutas" });
@@ -761,8 +761,11 @@ async function sanitiseAdminRecord(
 
   // FK ownership checks — read from camelCase body keys
   if (tableName === "appointments" && body["clientId"]) {
-    if (!await verifyClientOwnership(body["clientId"] as string, userId, clinicId))
-      return { ok: false, status: 403, error: "client_id does not belong to you" };
+    const [client] = await db.select({ assignedToUserId: clientsTable.assignedToUserId }).from(clientsTable)
+      .where(and(eq(clientsTable.id, String(body.clientId)), eq(clientsTable.userId, userId),
+        or(isNull(clientsTable.clinicId), eq(clientsTable.clinicId, clinicId))));
+    if (!client) return { ok: false, status: 403, error: "client_id does not belong to you" };
+    body.assignedToUserId = client.assignedToUserId;
   }
 
   if ((tableName === "session_media" || tableName === "session_exercises") && body["appointmentId"]) {
@@ -868,6 +871,10 @@ router.post(
       return;
     }
 
+    if (role === "physiotherapist") {
+      res.status(403).json({ error: "Apenas a administração pode criar registros por esta operação." });
+      return;
+    }
     // Patients may never bulk-insert
     if (role === "patient" && isBulk) {
       res.status(403).json({ error: "Forbidden" });
@@ -931,6 +938,10 @@ router.post(
         .values(sanitisedBodies[0]!)
         .returning() as Record<string, unknown>[];
       const row = inserted[0];
+      if (tableName === "appointments" && row?.clientId && ["agendado", "confirmado"].includes(String(row.status))) {
+        await enqueueAppointmentEvent(context.clinicId, String(row.id), "appointment_confirmation")
+          .catch((err) => req.log.warn({ err, appointmentId: row.id }, "Could not queue appointment confirmation"));
+      }
       res.status(201).json(row ? rowToSnake(row, drizzleTable) : null);
     }
   },
@@ -1024,7 +1035,7 @@ router.patch(
             });
             return;
           }
-          if (appt.status !== "agendado") {
+          if (!["agendado", "confirmado", "presenca_confirmada"].includes(appt.status)) {
             res.status(409).json({
               error: `Cannot check in: appointment is already '${appt.status}'`,
             });
@@ -1059,7 +1070,8 @@ router.patch(
         const updatedRows = await db
           .update(tbl)
           .set(patientBody)
-          .where(eq(tbl["id"], id))
+          .where(and(eq(tbl["id"], id), eq(tbl["clientId"], clientId),
+            patientBody.status ? eq(tbl["status"], appt.status) : undefined))
           .returning() as Record<string, unknown>[];
         if (!updatedRows[0]) {
           res.status(404).json({ error: "Record not found" });
@@ -1150,10 +1162,22 @@ router.patch(
     }
 
     // -----------------------------------------------------------------------
+    // Completing a visit and consuming its package session must commit together.
+    // Both the calendar and the clinical record submit this same transition.
+    if (tableName === "appointments" && rawInput.status === "atendido" && (isAdminRole(role) || role === "physiotherapist")) {
+      const details = bodyToDb(rawInput, appointmentsTable as typeof CLINIC_TABLE_REGISTRY.appointments.table);
+      const result = await completeVisit(id, userId, context.clinicId, isAdminRole(role), details);
+      if (result.status !== 200) { res.status(result.status).json({ error: result.error }); return; }
+      res.json(isAdminRole(role) ? rowToSnake(result.visit, appointmentsTable) : { id, status: "atendido" });
+      return;
+    }
     // Admin PATCH — FK ownership verification on changed FK fields
     // -----------------------------------------------------------------------
+    if (!isAdminRole(role)) {
+      res.status(403).json({ error: "Operação exclusiva da administração." });
+      return;
+    }
     const entry = CLINIC_TABLE_REGISTRY[tableName as TableSlug];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const drizzleTable = entry.table as any;
     // Convert incoming body (snake_case or camelCase) to Drizzle camelCase property names
     const body = bodyToDb(rawInput, drizzleTable);
@@ -1327,6 +1351,13 @@ router.patch(
       )!;
     }
 
+    if (tableName === "appointments") {
+      const keepCompleted = [];
+      if ("status" in body) keepCompleted.push(eq(appointmentsTable.status, String(body.status)));
+      if ("packageId" in body) keepCompleted.push(body.packageId ? eq(appointmentsTable.packageId, String(body.packageId)) : isNull(appointmentsTable.packageId));
+      if ("clientId" in body) keepCompleted.push(body.clientId ? eq(appointmentsTable.clientId, String(body.clientId)) : isNull(appointmentsTable.clientId));
+      if (keepCompleted.length) whereClause = and(whereClause, or(ne(appointmentsTable.status, "atendido"), and(...keepCompleted)))!;
+    }
     const updatedRows = await db
       .update(drizzleTable)
       .set(body)
@@ -1336,15 +1367,13 @@ router.patch(
       res.status(404).json({ error: "Record not found" });
       return;
     }
-    if (tableName === "appointments") {
+    if (tableName === "appointments" && ["agendado", "confirmado"].includes(String(updatedRows[0].status))
+      && (body.appointmentDate || body.appointmentTime || body.status === "confirmado")) {
       try {
-        const eventType = body["appointmentDate"] || body["appointmentTime"] || body["service"]
-          ? "reschedule" as const
-          : "appointment_confirmation" as const;
         await enqueueAppointmentEvent(
           context.clinicId,
           updatedRows[0]["id"] as string,
-          eventType,
+          "appointment_confirmation",
           `generic-update:${JSON.stringify({
             date: updatedRows[0]["appointmentDate"],
             time: updatedRows[0]["appointmentTime"],
@@ -1632,7 +1661,7 @@ router.post(
 
     // Load the patient's client to derive name + owning admin
     const [client] = await db
-    .select({ name: clientsTable.name, adminUserId: clientsTable.userId, clinicId: clientsTable.clinicId })
+    .select({ name: clientsTable.name, adminUserId: clientsTable.userId, clinicId: clientsTable.clinicId, assignedToUserId: clientsTable.assignedToUserId })
       .from(clientsTable)
       .where(eq(clientsTable.id, clientId))
       .limit(1);
@@ -1658,8 +1687,9 @@ router.post(
           return { conflict: true as const, reason: "Slot does not belong to your clinic" };
         }
         // Slot must currently be open
-        if (slot.status !== "aberto") {
-          return { conflict: true as const, reason: "Slot is no longer available" };
+        const availableToPatient = slot.status === "aberto" || (slot.status === "reservado" && slot.reservedForClientId === clientId);
+        if (!availableToPatient || slot.appointmentId || (slot.reservedForClientId && slot.reservedForClientId !== clientId) || new Date(`${slot.slotDate}T${slot.startTime}-03:00`) <= new Date()) {
+          return { conflict: true as const, reason: "Este horário já não está disponível. Escolha outro." };
         }
 
         // Create the appointment (status "solicitado"), matching slot date/time & admin
@@ -1668,14 +1698,17 @@ router.post(
           .values({
             userId: slot.userId,
             clinicId: client.clinicId ?? patientContext.clinicId,
+            assignedToUserId: client.assignedToUserId,
             clientId,
             clientName: client.name,
             appointmentDate: slot.slotDate,
             appointmentTime: slot.startTime,
             service: "Sessão solicitada",
             price: "0",
+            paymentStatus: "pendente",
             status: "solicitado",
-            durationMin: 50,
+            durationMin: Math.max(1, (Number(slot.endTime.slice(0, 2)) - Number(slot.startTime.slice(0, 2))) * 60
+              + Number(slot.endTime.slice(3, 5)) - Number(slot.startTime.slice(3, 5))),
           })
           .returning();
 
@@ -1691,7 +1724,9 @@ router.post(
           .where(
             and(
               eq(availabilitySlotsTable.id, slotId),
-              eq(availabilitySlotsTable.status, "aberto"),
+              eq(availabilitySlotsTable.status, slot.status),
+              isNull(availabilitySlotsTable.appointmentId),
+              or(isNull(availabilitySlotsTable.reservedForClientId), eq(availabilitySlotsTable.reservedForClientId, clientId)),
               eq(availabilitySlotsTable.userId, client.adminUserId),
             ),
           )
@@ -1702,6 +1737,7 @@ router.post(
           throw new SlotConflictError("Slot was reserved by someone else");
         }
 
+        await enqueueBookingAlert(tx, patientContext.clinicId, appt.id, appt.appointmentDate);
         return { conflict: false as const, appointment: appt, slot: reservedSlots[0] };
       });
 
@@ -1710,13 +1746,6 @@ router.post(
         return;
       }
 
-      if (result.appointment.clinicId) {
-        try {
-          await enqueueAppointmentEvent(result.appointment.clinicId, result.appointment.id, "appointment_confirmation");
-        } catch (error) {
-          req.log.warn({ err: error, appointmentId: result.appointment.id }, "Could not queue WhatsApp booking confirmation");
-        }
-      }
       res.status(201).json({
         appointment: rowToSnake(result.appointment, appointmentsTable),
         slot: rowToSnake(result.slot, availabilitySlotsTable),

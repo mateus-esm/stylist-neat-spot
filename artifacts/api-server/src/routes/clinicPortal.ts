@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
-import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   db,
   appointmentsTable,
@@ -20,10 +20,11 @@ import {
   ensureClinicForUser,
   getClientIdForPatient,
   getStoredRole,
+  clinicalFields,
   isAdminRole,
   isStaffRole,
 } from "../lib/clinicRole";
-import { enqueueAppointmentEvent } from "../lib/whatsapp";
+import { enqueueAppointmentEvent, enqueueBookingDeclined } from "../lib/whatsapp";
 
 const router: IRouter = Router();
 router.use(requireClinicAuth);
@@ -105,14 +106,17 @@ router.get("/clinic/portal", async (req: Request, res: Response) => {
     clientIds.length ? db.select().from(sessionPlansTable).where(inArray(sessionPlansTable.clientId, clientIds)) : db.select().from(sessionPlansTable).where(eq(sessionPlansTable.userId, userId)),
     ids.length ? db.select().from(sessionExercisesTable).where(inArray(sessionExercisesTable.appointmentId, ids)) : Promise.resolve([]),
   ]);
-  const slotOwner = clients[0]?.assignedToUserId ?? clients[0]?.userId ?? appointments[0]?.userId;
+  const slotOwner = clients[0]?.userId ?? appointments[0]?.userId;
   const slots = context.role === "patient" && slotOwner
     ? await db.select().from(availabilitySlotsTable).where(and(
-      eq(availabilitySlotsTable.status, "aberto"),
-      eq(availabilitySlotsTable.userId, slotOwner),
-    ))
+      or(eq(availabilitySlotsTable.status, "aberto"),
+        and(eq(availabilitySlotsTable.status, "reservado"), eq(availabilitySlotsTable.reservedForClientId, clientId!))),
+      eq(availabilitySlotsTable.userId, slotOwner), isNull(availabilitySlotsTable.appointmentId),
+      or(isNull(availabilitySlotsTable.reservedForClientId), eq(availabilitySlotsTable.reservedForClientId, clientId!)),
+    )).orderBy(asc(availabilitySlotsTable.slotDate), asc(availabilitySlotsTable.startTime))
     : [];
-  return res.json({ clinicId: context.clinicId, role: context.role, client: clients[0] ?? null, clients, appointments, packages, plans, exercises, availableSlots: slots });
+  return res.json({ clinicId: context.clinicId, role: context.role, client: clients[0] ?? null, clients, appointments: context.role === "physiotherapist" ? appointments.map(clinicalFields) : appointments,
+    packages: context.role === "physiotherapist" ? packages.map(clinicalFields) : packages, plans, exercises, availableSlots: slots.filter((s) => new Date(`${s.slotDate}T${s.startTime}-03:00`) > new Date()) });
 });
 
 router.get("/clinic/portal/appointments/:id", async (req: Request, res: Response) => {
@@ -129,7 +133,7 @@ router.get("/clinic/portal/appointments/:id", async (req: Request, res: Response
     clinicId: context.clinicId, actorUserId: userId, action: "clinical_record.viewed",
     resourceType: "appointment", resourceId: id, metadata: {},
   });
-  return res.json({ appointment, exercises, plans });
+  return res.json({ appointment: context.role === "physiotherapist" ? clinicalFields(appointment) : appointment, exercises, plans });
 });
 
 router.post("/clinic/portal/appointments/:id/actions", async (req: Request, res: Response) => {
@@ -148,6 +152,12 @@ router.post("/clinic/portal/appointments/:id/actions", async (req: Request, res:
   )).limit(1);
   if (existing[0]) return res.json(existing[0].result);
 
+  if (new Date(`${appointment.appointmentDate}T${appointment.appointmentTime}-03:00`) <= new Date()) {
+    return res.status(409).json({ error: "Este horário já passou. Consulte sua agenda atual." });
+  }
+  const allowedStatuses = parsed.data.action === "confirm_presence"
+    ? ["agendado", "confirmado"]
+    : ["agendado", "confirmado", "presenca_confirmada"];
   const nextStatus = {
     confirm_presence: "presenca_confirmada",
     request_reschedule: "reagendamento_solicitado",
@@ -157,9 +167,16 @@ router.post("/clinic/portal/appointments/:id/actions", async (req: Request, res:
   try {
     const saved = await db.transaction(async (tx) => {
       const [updated] = await tx.update(appointmentsTable).set({ status: nextStatus }).where(and(
-        eq(appointmentsTable.id, id), eq(appointmentsTable.clientId, await getClientIdForPatient(userId) as string),
+        eq(appointmentsTable.id, id), eq(appointmentsTable.clientId, appointment.clientId!),
+        inArray(appointmentsTable.status, allowedStatuses),
       )).returning();
-      if (!updated) throw new Error("Appointment changed before action");
+      if (!updated) {
+        const [retry] = await tx.select().from(clinicActionsTable).where(and(
+          eq(clinicActionsTable.appointmentId, id), eq(clinicActionsTable.idempotencyKey, parsed.data.idempotencyKey),
+        ));
+        if (retry) return retry.result;
+        throw new Error("Appointment changed before action");
+      }
       const [action] = await tx.insert(clinicActionsTable).values({
         clinicId: context.clinicId, appointmentId: id, actorUserId: userId,
         action: parsed.data.action, idempotencyKey: parsed.data.idempotencyKey, result,
@@ -170,20 +187,62 @@ router.post("/clinic/portal/appointments/:id/actions", async (req: Request, res:
       clinicId: context.clinicId, actorUserId: userId, action: `appointment.${parsed.data.action}`,
       resourceType: "appointment", resourceId: id, metadata: { idempotencyKey: parsed.data.idempotencyKey },
     });
-    try {
-      await enqueueAppointmentEvent(
-        context.clinicId,
-        id,
-        parsed.data.action === "confirm_presence" ? "appointment_confirmation" : "reschedule",
-        `${parsed.data.action}:${parsed.data.idempotencyKey}`,
-      );
-    } catch (error) {
-      req.log.warn({ err: error, appointmentId: id }, "Could not queue WhatsApp appointment event");
+    if (parsed.data.action === "request_reschedule") {
+      await enqueueAppointmentEvent(context.clinicId, id, "reschedule", parsed.data.idempotencyKey)
+        .catch((err) => req.log.warn({ err, appointmentId: id }, "Could not queue reschedule receipt"));
     }
     return res.json(saved);
   } catch {
     return res.status(409).json({ error: "O agendamento mudou antes da confirmação; atualize a página" });
   }
+});
+
+const bookingFields = {
+  id: appointmentsTable.id, clientName: appointmentsTable.clientName, status: appointmentsTable.status,
+  appointmentDate: appointmentsTable.appointmentDate, appointmentTime: appointmentsTable.appointmentTime,
+};
+
+router.get("/clinic/booking-requests", async (req, res) => {
+  const { userId } = getAuth(req);
+  const context = userId && await contextFor(userId);
+  if (!context || !isAdminRole(context.role)) return res.status(403).json({ error: "Acesso exclusivo da gestão." });
+  const id = z.string().uuid().optional().safeParse(req.query.id);
+  if (!id.success) return res.status(400).json({ error: "Link de solicitação inválido." });
+  const rows = await db.select(bookingFields).from(appointmentsTable).where(and(
+    eq(appointmentsTable.clinicId, context.clinicId),
+    id.data ? eq(appointmentsTable.id, id.data) : eq(appointmentsTable.status, "solicitado"),
+  )).orderBy(asc(appointmentsTable.appointmentDate), asc(appointmentsTable.appointmentTime));
+  return res.json(rows);
+});
+
+router.post("/clinic/booking-requests/:id", async (req, res) => {
+  const { userId } = getAuth(req);
+  const context = userId && await contextFor(userId);
+  if (!context || !isAdminRole(context.role)) return res.status(403).json({ error: "Acesso exclusivo da gestão." });
+  const id = z.string().uuid().safeParse(req.params.id);
+  const decision = z.enum(["approve", "decline"]).safeParse(req.body?.decision);
+  if (!id.success || !decision.success) return res.status(400).json({ error: "Solicitação inválida." });
+  const approve = decision.data === "approve";
+  const updated = await db.transaction(async (tx) => {
+    const [appointment] = await tx.update(appointmentsTable).set({ status: approve ? "confirmado" : "cancelado" })
+      .where(and(eq(appointmentsTable.id, id.data), eq(appointmentsTable.clinicId, context.clinicId),
+        eq(appointmentsTable.status, "solicitado"))).returning();
+    if (!appointment) return null;
+    if (approve) {
+      await enqueueAppointmentEvent(context.clinicId, appointment.id, "appointment_confirmation", "booking-approved", tx);
+    } else {
+      await tx.update(availabilitySlotsTable).set({ status: sql`case when ${availabilitySlotsTable.reservedForClientId} is null then 'aberto' else 'reservado' end`, appointmentId: null })
+        .where(eq(availabilitySlotsTable.appointmentId, appointment.id));
+      if (appointment.clientId) await enqueueBookingDeclined(tx, context.clinicId, appointment.clientId, appointment.id);
+    }
+    await tx.insert(clinicAuditEventsTable).values({
+      clinicId: context.clinicId, actorUserId: userId!, action: approve ? "booking.approved" : "booking.declined",
+      resourceType: "appointment", resourceId: appointment.id, metadata: {},
+    });
+    return appointment.id;
+  });
+  if (!updated) return res.status(409).json({ error: "Este pedido já foi avaliado ou está indisponível." });
+  return res.json({ id: updated });
 });
 
 export default router;

@@ -373,3 +373,9 @@ export async function assignRole(
     .values({ userId, role })
     .onConflictDoNothing();
 }
+
+/** Financial fields are reserved for management and the patient's own portal. */
+export function clinicalFields(row: Record<string, unknown>) {
+  const { price, paymentStatus, paidAt, defaultPrice, ...clinical } = row;
+  return clinical;
+}

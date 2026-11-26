@@ -15,7 +15,7 @@ export const appointmentsTable = pgTable("appointments", {
   service: text("service").notNull(),
   price: numeric("price", { precision: 10, scale: 2 }).notNull().default("0"),
   status: text("status").notNull().default("agendado"),
-  durationMin: integer("duration_min").default(30),
+  durationMin: integer("duration_min").default(60),
   paymentStatus: text("payment_status").notNull().default("pago"),
   photoUrl: text("photo_url"),
   satisfaction: integer("satisfaction"),

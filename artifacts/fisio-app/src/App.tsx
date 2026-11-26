@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,21 +7,21 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
-import Index from "./pages/Index";
-import Patients from "./pages/Patients";
-import Returns from "./pages/Returns";
-import Financial from "./pages/Financial";
-import Auth from "./pages/Auth";
-import NotFound from "./pages/NotFound";
-import Availability from "./pages/Availability";
-import Settings from "./pages/Settings";
-import Packages from "./pages/Packages";
-import Planning from "./pages/Planning";
-import PatientPortal from "./pages/PatientPortal";
-import PatientSession from "./pages/PatientSession";
-import AcceptInvite from "./pages/AcceptInvite";
+const Index = lazy(() => import("./pages/Index"));
+const Patients = lazy(() => import("./pages/Patients"));
+const Returns = lazy(() => import("./pages/Returns"));
+const Financial = lazy(() => import("./pages/Financial"));
+const Auth = lazy(() => import("./pages/Auth"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Availability = lazy(() => import("./pages/Availability"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Packages = lazy(() => import("./pages/Packages"));
+const Planning = lazy(() => import("./pages/Planning"));
+const PatientPortal = lazy(() => import("./pages/PatientPortal"));
+const PatientSession = lazy(() => import("./pages/PatientSession"));
+const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 import BottomNav from "./components/BottomNav";
-import { signInRedirectUrl } from "./lib/authRedirect";
+import { localReturnPath, signInRedirectUrl } from "./lib/authRedirect";
 
 import { ClerkProvider } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
@@ -32,7 +33,7 @@ const clerkPubKey = publishableKeyFromHost(
 );
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
-const ProtectedRoute = ({ children, allow }: { children: React.ReactNode; allow?: "staff" | "patient" }) => {
+const ProtectedRoute = ({ children, allow }: { children: React.ReactNode; allow?: "staff" | "patient" | "admin" }) => {
   const { user, loading } = useAuth();
   const { role, loading: roleLoading } = useRole();
   const location = useLocation();
@@ -50,6 +51,7 @@ const ProtectedRoute = ({ children, allow }: { children: React.ReactNode; allow?
       </div>
     );
   }
+  if (allow === "admin" && role !== "owner" && role !== "admin") return <Navigate to={role === "patient" ? "/meu-app" : "/"} replace />;
   const allowed = !allow || (allow === "patient" ? role === "patient" : role !== "patient");
   if (!allowed) return <Navigate to={role === "patient" ? "/meu-app" : "/"} replace />;
   return <>{children}</>;
@@ -59,7 +61,7 @@ const AuthRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   const { role, loading: roleLoading } = useRole();
   if (loading || (user && roleLoading)) return <div className="flex min-h-screen items-center justify-center">Carregando...</div>;
-  if (user && role) return <Navigate to={role === "patient" ? "/meu-app" : "/"} replace />;
+  if (user && role) return <Navigate to={localReturnPath(new URLSearchParams(window.location.search).get("redirect"), role === "patient" ? "/meu-app" : "/")} replace />;
   if (user && !role) return <Navigate to="/" replace />; // Let ProtectedRoute handle the no-role screen
   return <>{children}</>;
 };
@@ -85,6 +87,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
+            <Suspense fallback={<div role="status" className="p-6 text-center text-sm">Carregando…</div>}>
             <Routes>
               <Route path="/auth" element={<Navigate to="/sign-in" replace />} />
               <Route path="/sign-in/*" element={<AuthRoute><Auth /></AuthRoute>} />
@@ -96,7 +99,7 @@ const App = () => (
               <Route path="/pacientes" element={<ProtectedRoute allow="staff"><AppLayout><Patients /></AppLayout></ProtectedRoute>} />
               <Route path="/clientes" element={<Navigate to="/pacientes" replace />} />
               <Route path="/retornos" element={<ProtectedRoute allow="staff"><AppLayout><Returns /></AppLayout></ProtectedRoute>} />
-              <Route path="/financeiro" element={<ProtectedRoute allow="staff"><AppLayout><Financial /></AppLayout></ProtectedRoute>} />
+              <Route path="/financeiro" element={<ProtectedRoute allow="admin"><AppLayout><Financial /></AppLayout></ProtectedRoute>} />
               <Route path="/disponibilidade" element={<ProtectedRoute allow="staff"><AppLayout><Availability /></AppLayout></ProtectedRoute>} />
               <Route path="/pacotes" element={<ProtectedRoute allow="staff"><AppLayout><Packages /></AppLayout></ProtectedRoute>} />
               <Route path="/planejamento" element={<ProtectedRoute allow="staff"><AppLayout><Planning /></AppLayout></ProtectedRoute>} />
@@ -109,6 +112,7 @@ const App = () => (
 
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </Suspense>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

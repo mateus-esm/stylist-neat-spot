@@ -39,6 +39,8 @@ import type {
   GetPortalAppointment200,
   GetWhatsappConsent200,
   HealthStatus,
+  ListBookingRequests200Item,
+  ListBookingRequestsParams,
   ListClinicAuditEvents200Item,
   ListClinicRecordsParams,
   ListWhatsappOutbox200Item,
@@ -49,6 +51,8 @@ import type {
   PerformPortalAppointmentAction200,
   PortalAppointmentActionInput,
   ReceiveWhatsmiauWebhookParams,
+  ReviewBookingRequest200,
+  ReviewBookingRequestBody,
   TransferClinicAppointment200,
   TransferClinicAppointmentBody,
   UpdateWhatsappConsent200,
@@ -103,6 +107,7 @@ export const getHealthCheckUrl = () => {
 
   return `/api/healthz`
 }
+
 /**
  * Returns server health status
  * @summary Health check
@@ -166,6 +171,12 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
 
 export const getGetClinicSessionUrl = () => {
 
@@ -239,6 +250,11 @@ export function useGetClinicSession<TData = Awaited<ReturnType<typeof getClinicS
 }
 
 
+
+
+
+
+
 export const getGetClinicContextUrl = () => {
 
 
@@ -309,6 +325,13 @@ export function useGetClinicContext<TData = Awaited<ReturnType<typeof getClinicC
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+
 export const getListClinicMembersUrl = () => {
 
 
@@ -824,6 +847,150 @@ export function useListClinicAuditEvents<TData = Awaited<ReturnType<typeof listC
 
 
 
+
+export const getListBookingRequestsUrl = (params?: ListBookingRequestsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/clinic/booking-requests?${stringifiedParams}` : `/api/clinic/booking-requests`
+}
+
+export const listBookingRequests = async (params?: ListBookingRequestsParams, options?: Parameters<typeof customFetch>[1]): Promise<ListBookingRequests200Item[]> => {
+
+  return customFetch<ListBookingRequests200Item[]>(getListBookingRequestsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBookingRequestsQueryKey = (params?: ListBookingRequestsParams,) => {
+    return [
+    `/api/clinic/booking-requests`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListBookingRequestsQueryOptions = <TData = Awaited<ReturnType<typeof listBookingRequests>>, TError = ErrorType<unknown>>(params?: ListBookingRequestsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBookingRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBookingRequestsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBookingRequests>>> = ({ signal }) => listBookingRequests(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBookingRequests>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBookingRequestsQueryResult = NonNullable<Awaited<ReturnType<typeof listBookingRequests>>>
+export type ListBookingRequestsQueryError = ErrorType<unknown>
+
+
+
+export function useListBookingRequests<TData = Awaited<ReturnType<typeof listBookingRequests>>, TError = ErrorType<unknown>>(
+ params?: ListBookingRequestsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBookingRequests>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBookingRequestsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReviewBookingRequestUrl = (id: string,) => {
+
+
+
+
+  return `/api/clinic/booking-requests/${id}`
+}
+
+export const reviewBookingRequest = async (id: string,
+    reviewBookingRequestBody: ReviewBookingRequestBody, options?: Parameters<typeof customFetch>[1]): Promise<ReviewBookingRequest200> => {
+
+  return customFetch<ReviewBookingRequest200>(getReviewBookingRequestUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(reviewBookingRequestBody)
+  }
+);}
+
+
+
+
+
+export const getReviewBookingRequestMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewBookingRequest>>, TError,{id: string;data: BodyType<ReviewBookingRequestBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewBookingRequest>>, TError,{id: string;data: BodyType<ReviewBookingRequestBody>}, TContext> => {
+
+const mutationKey = ['reviewBookingRequest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewBookingRequest>>, {id: string;data: BodyType<ReviewBookingRequestBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reviewBookingRequest(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewBookingRequestMutationResult = NonNullable<Awaited<ReturnType<typeof reviewBookingRequest>>>
+    export type ReviewBookingRequestMutationBody = BodyType<ReviewBookingRequestBody>
+    export type ReviewBookingRequestMutationError = ErrorType<void>
+
+    export const useReviewBookingRequest = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewBookingRequest>>, TError,{id: string;data: BodyType<ReviewBookingRequestBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewBookingRequest>>,
+        TError,
+        {id: string;data: BodyType<ReviewBookingRequestBody>},
+        TContext
+      > => {
+      return useMutation(getReviewBookingRequestMutationOptions(options));
+    }
 
 export const getGetPatientPortalUrl = () => {
 

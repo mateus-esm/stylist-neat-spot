@@ -66,7 +66,9 @@ const Financial = () => {
     if (period === "day") return { from: startOfDay(now), to: endOfDay(now) };
     if (period === "week") return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
     if (period === "month") return { from: startOfMonth(now), to: endOfMonth(now) };
-    return { from: new Date(customFrom + "T00:00:00"), to: new Date(customTo + "T23:59:59") };
+    const from = customFrom ? new Date(customFrom + "T00:00:00") : startOfMonth(now);
+    const to = customTo ? new Date(customTo + "T23:59:59") : endOfMonth(now);
+    return { from, to: to < from ? endOfDay(from) : to };
   }, [period, customFrom, customTo, appts, packages]);
 
   const fromStr = format(range.from, "yyyy-MM-dd");
@@ -110,8 +112,8 @@ const Financial = () => {
   const pending = pendingAvulso + pendingPkg;
 
   const activePackages = packages.filter((p) => p.status === "ativo").length;
-  const sessionsDone = completedAvulsos.length + appts.filter((a) => a.status === "atendido" && a.package_id && a.appointment_date >= fromStr && a.appointment_date <= toStr).length;
-  const ticketBaseCount = completedAvulsos.length + paidPackagesInRange.length;
+  const sessionsDone = completedAvulsos.length + appts.filter((a) => a.status === "atendido" && a.package_id && a.appointment_date >= fromStr && a.appointment_date <= toStr && (filterClient === "all" || a.client_id === filterClient) && (filterService === "all" || a.service === filterService)).length;
+  const ticketBaseCount = completedAvulsos.filter((a) => a.payment_status === "pago").length + paidPackagesInRange.length;
   const avgTicket = ticketBaseCount > 0 ? grossRevenue / ticketBaseCount : 0;
 
   const services = useMemo(() => {
@@ -241,11 +243,11 @@ const Financial = () => {
                 <div className="grid grid-cols-2 gap-1 col-span-2 sm:col-span-1">
                   <div className="space-y-1">
                     <Label className="text-[10px] uppercase tracking-wider">De</Label>
-                    <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-sm h-9" />
+                    <Input type="date" max={customTo || undefined} value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-sm h-9" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[10px] uppercase tracking-wider">Até</Label>
-                    <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="rounded-sm h-9" />
+                    <Input type="date" min={customFrom || undefined} value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="rounded-sm h-9" />
                   </div>
                 </div>
               )}

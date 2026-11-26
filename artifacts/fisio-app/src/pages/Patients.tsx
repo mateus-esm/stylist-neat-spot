@@ -18,6 +18,8 @@ import ClientForm from "@/components/ClientForm";
 import { BrandLogo } from "@/components/BrandLogo";
 import { cn } from "@/lib/utils";
 import { appointmentStatusLabel, paymentStatusLabel } from "@/lib/statusLabels";
+import PatientMessaging from "@/components/PatientMessaging";
+import { useRole } from "@/hooks/useRole";
 import DataErrorState from "@/components/DataErrorState";
 
 const db = supabase as any;
@@ -31,6 +33,7 @@ const emptyAnamnesis = {
 
 const Patients = () => {
   const { user } = useAuth();
+  const { isAdmin } = useRole();
   const [patients, setPatients] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -278,7 +281,8 @@ const Patients = () => {
 
 
 
-              <Tabs defaultValue="anamnesis" className="mt-6">
+              {isAdmin && selectedPatient && <PatientMessaging key={selectedPatient.id} clientId={selectedPatient.id} phone={selectedPatient.phone} />}
+            <Tabs defaultValue="anamnesis" className="mt-6">
                 <TabsList className="grid w-full grid-cols-3 rounded-sm">
                   <TabsTrigger value="anamnesis" className="rounded-sm">Anamnese</TabsTrigger>
                   <TabsTrigger value="packages" className="rounded-sm">Pacotes</TabsTrigger>

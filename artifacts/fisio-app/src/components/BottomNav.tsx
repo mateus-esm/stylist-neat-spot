@@ -5,7 +5,7 @@ import { useRole } from "@/hooks/useRole";
 
 const adminTabs = [
   { path: "/", icon: CalendarDays, label: "Agenda" },
-  { path: "/disponibilidade", icon: CalendarClock, label: "Slots" },
+  { path: "/disponibilidade", icon: CalendarClock, label: "Horários" },
   { path: "/pacientes", icon: Users, label: "Pacientes" },
   { path: "/pacotes", icon: Package, label: "Pacotes" },
   { path: "/planejamento", icon: ClipboardList, label: "Planos" },
@@ -20,23 +20,24 @@ const patientTabs = [
 const BottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isPatient, isStaff } = useRole();
+  const { isPatient, isStaff, isAdmin } = useRole();
 
   if (!isStaff && !isPatient) return null;
-  const tabs = isPatient ? patientTabs : adminTabs;
+  const tabs = isPatient ? patientTabs : adminTabs.filter((tab) => isAdmin || ["/", "/pacientes", "/planejamento"].includes(tab.path));
   if (tabs.length < 2) return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background">
-      <div className="mx-auto flex max-w-lg">
+      <div className="mx-auto flex max-w-3xl">
         {tabs.map((tab) => {
           const active = location.pathname === tab.path;
           return (
             <button
               key={tab.path}
+              aria-current={active ? "page" : undefined}
               onClick={() => navigate(tab.path)}
               className={cn(
-                "relative flex flex-1 flex-col items-center gap-1 py-3 text-[10px] uppercase tracking-[0.14em] transition-colors",
+                "relative flex min-w-0 flex-1 flex-col items-center gap-1 py-3 text-[9px] sm:text-xs transition-colors",
                 active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
               )}
             >

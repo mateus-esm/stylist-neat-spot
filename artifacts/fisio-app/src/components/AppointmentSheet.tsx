@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import PrescriptionTab from "./PrescriptionTab";
 import MediaTab from "./MediaTab";
-import { completeAppointment } from "@/lib/appointmentCompletion";
+import { useRole } from "@/hooks/useRole";
 
 interface Props {
   open: boolean;
@@ -24,6 +24,7 @@ interface Props {
 }
 
 const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit, onLog, onRefresh }: Props) => {
+  const { isAdmin } = useRole();
   const [client, setClient] = useState<any>(null);
 
   useEffect(() => {
@@ -37,13 +38,8 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
   if (!appointment) return null;
 
   const updateStatus = async (status: string) => {
-    if (status === "atendido") {
-      const { error } = await completeAppointment(appointment.id);
-      if (error) { toast.error(error); return; }
-    } else {
-      const { error } = await supabase.from("appointments").update({ status }).eq("id", appointment.id);
-      if (error) { toast.error(error.message); return; }
-    }
+    const { error } = await supabase.from("appointments").update({ status }).eq("id", appointment.id);
+    if (error) { toast.error(error.message); return; }
     toast.success("Status atualizado");
     onRefresh();
     onOpenChange(false);
@@ -63,9 +59,9 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
     if (!phone) { toast.error("Cliente sem telefone"); return; }
     const fullPhone = phone.startsWith("55") ? phone : `55${phone}`;
     const msg = encodeURIComponent(
-      `Olá ${appointment.client_name}! Confirmando sua sessão às ${appointment.appointment_time?.slice(0, 5)} no dia ${format(new Date(appointment.appointment_date + "T12:00:00"), "dd/MM")}. — One Fisioterapia Esportiva`
+      `Olá ${appointment.client_name}! Confirmando sua sessão às ${appointment.appointment_time?.slice(0, 5)} no dia ${format(new Date(appointment.appointment_date + "T12:00:00"), "dd/MM")}. Confirme sua presença no aplicativo: ${window.location.origin}/meu-app/agenda/${appointment.id}`
     );
-    window.open(`https://wa.me/${fullPhone}?text=${msg}`, "_blank");
+    window.open(`https://wa.me/${fullPhone}?text=${msg}`, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -90,10 +86,10 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
               <Badge variant="outline" className="border-primary/40 text-primary">
                 {appointment.service}
               </Badge>
-              <Badge variant="outline">{appointment.duration_min || 30} min</Badge>
-              <Badge className="bg-gradient-brand text-primary-foreground">
+              <Badge variant="outline">{appointment.duration_min || 60} min</Badge>
+              {isAdmin && <Badge className="bg-gradient-brand text-primary-foreground">
                 R$ {Number(appointment.price).toFixed(2)}
-              </Badge>
+              </Badge>}
             </div>
 
             {client?.notes && (
@@ -105,8 +101,8 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
 
             {appointment.photo_url && (
               <div className="space-y-2">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">Foto do corte</p>
-                <img src={appointment.photo_url} alt="Corte" className="w-full rounded-lg" />
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Foto da sessão</p>
+                <img src={appointment.photo_url} alt="Registro da sessão" className="w-full rounded-lg" />
               </div>
             )}
 
@@ -129,12 +125,12 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
               <Button onClick={notify} variant="outline" className="gap-2">
                 <MessageCircle className="h-4 w-4" /> Notificar
               </Button>
-              <Button onClick={onEdit} variant="outline" className="gap-2">
+              {isAdmin && <Button onClick={onEdit} variant="outline" className="gap-2">
                 <Edit3 className="h-4 w-4" /> Editar
-              </Button>
+              </Button>}
             </div>
 
-            {appointment.status !== "atendido" && (
+            {["agendado", "confirmado", "presenca_confirmada", "em_andamento"].includes(appointment.status) && (
               <Button
                 onClick={onLog}
                 className="w-full bg-gradient-brand text-primary-foreground shadow-brand hover:opacity-90"
@@ -144,7 +140,7 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
               </Button>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
+            {isAdmin && <><div className="grid grid-cols-2 gap-2">
               {appointment.status !== "confirmado" && appointment.status !== "atendido" && (
                 <Button onClick={() => updateStatus("confirmado")} variant="outline" className="gap-2">
                   <Clock className="h-4 w-4" /> Confirmar
@@ -159,7 +155,7 @@ const AppointmentSheet = ({ open, onOpenChange, appointment, onComplete, onEdit,
 
             <Button onClick={remove} variant="ghost" className="w-full text-destructive hover:text-destructive">
               <Trash2 className="h-4 w-4 mr-2" /> Excluir agendamento
-            </Button>
+            </Button></>}
           </TabsContent>
 
           <TabsContent value="prescricao" className="mt-4">

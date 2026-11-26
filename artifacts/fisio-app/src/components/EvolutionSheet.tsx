@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useRole } from "@/hooks/useRole";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,8 @@ interface Props {
 
 const EvolutionSheet = ({ open, onOpenChange, appointment, onSuccess }: Props) => {
   const { user } = useAuth();
-  const [duration, setDuration] = useState("50");
+  const { isAdmin } = useRole();
+  const [duration, setDuration] = useState("60");
   const [price, setPrice] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<"pago" | "pendente">("pendente");
   const [packageId, setPackageId] = useState("avulso");
@@ -39,7 +41,7 @@ const EvolutionSheet = ({ open, onOpenChange, appointment, onSuccess }: Props) =
   useEffect(() => {
     if (!open || !appointment) return;
 
-    setDuration(String(appointment.duration_min || 50));
+    setDuration(String(appointment.duration_min || 60));
     setPrice(String(appointment.price || 0));
     setPaymentStatus(appointment.payment_status || "pendente");
     setPackageId(appointment.package_id || "avulso");
@@ -48,9 +50,9 @@ const EvolutionSheet = ({ open, onOpenChange, appointment, onSuccess }: Props) =
     setMediaPreview(appointment.media_url || appointment.photo_url || null);
     setMediaFile(null);
 
-    if (appointment.client_id) fetchPackages(appointment.client_id);
+    if (isAdmin && appointment.client_id) fetchPackages(appointment.client_id);
     else setPackages([]);
-  }, [open, appointment]);
+  }, [open, appointment, isAdmin]);
 
   const fetchPackages = async (clientId: string) => {
     const { data } = await db
@@ -105,50 +107,26 @@ const EvolutionSheet = ({ open, onOpenChange, appointment, onSuccess }: Props) =
     setLoading(true);
 
     const selectedPackage = packages.find((pkg) => pkg.id === packageId);
-    const packageSessionIndex = selectedPackage
-      ? (appointment.package_session_index || Number(selectedPackage.completed_sessions || 0) + 1)
-      : null;
-    const packageTotal = selectedPackage ? Number(selectedPackage.total_sessions || 0) : null;
-
     // For package-linked sessions, force price=0 and don't override payment_status of the package.
     const effectivePrice = selectedPackage ? 0 : (parseFloat(price) || 0);
     const effectivePayment = selectedPackage ? "pago" : paymentStatus;
 
     const mediaUrl = await uploadMedia();
-    const { error } = await db
-      .from("appointments")
-      .update({
-        duration_min: parseInt(duration) || 50,
-        price: effectivePrice,
-        payment_status: effectivePayment,
-        package_id: selectedPackage?.id || null,
-        package_session_index: packageSessionIndex,
-        package_total: packageTotal,
-        pain_scale: parseInt(painScale) || 0,
-        evolution_notes: evolutionNotes || null,
-        observations: evolutionNotes || null,
-        media_url: mediaUrl,
-        photo_url: mediaUrl,
-      })
-      .eq("id", appointment.id);
-
-    if (error) {
-      setLoading(false);
-      toast.error("Erro ao registrar evolucao", { description: error.message });
-      return;
-    }
-
-    // Use shared helper to mark atendido + increment package counter idempotently
-    const { error: completeErr } = await completeAppointment(appointment.id);
+    const { error: completeErr } = await completeAppointment(appointment.id, {
+      duration_min: Number(duration),
+      ...(isAdmin && { price: effectivePrice, payment_status: effectivePayment,
+        package_id: packageId === "avulso" ? null : packageId }),
+      pain_scale: painScale === "" ? null : Number(painScale),
+      evolution_notes: evolutionNotes || null, observations: evolutionNotes || null,
+      media_url: mediaUrl, photo_url: mediaUrl,
+    });
     setLoading(false);
     if (completeErr) {
       toast.error("Erro ao concluir sessão", { description: completeErr });
       return;
     }
 
-    toast.success("Evolucao registrada", {
-      description: effectivePayment === "pendente" ? "Fluxo operacional concluido; financeiro ficou pendente." : "Sessao e financeiro atualizados.",
-    });
+    toast.success("Sessão concluída e evolução registrada.");
     onOpenChange(false);
     onSuccess();
   };
@@ -171,16 +149,16 @@ const EvolutionSheet = ({ open, onOpenChange, appointment, onSuccess }: Props) =
         <div className="mt-6 space-y-5">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Duracao (min)</Label>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Duração (min)</Label>
               <Input type="number" min="1" value={duration} onChange={(event) => setDuration(event.target.value)} className="rounded-sm" />
             </div>
-            <div className="space-y-2">
+            {isAdmin && <div className="space-y-2">
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Valor (R$)</Label>
               <Input type="number" step="0.01" value={price} onChange={(event) => setPrice(event.target.value)} className="rounded-sm" />
-            </div>
+            </div>}
           </div>
 
-          <div className="space-y-2">
+          {isAdmin && <><div className="space-y-2">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Vincular a plano</Label>
             <Select value={packageId} onValueChange={setPackageId}>
               <SelectTrigger className="rounded-sm">
@@ -222,9 +200,9 @@ const EvolutionSheet = ({ open, onOpenChange, appointment, onSuccess }: Props) =
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              A evolucao sempre conclui a sessao. Se nao recebeu, mantenha como pendente para o financeiro cobrar depois.
+              A evolução conclui a sessão. Se o valor ainda estiver em aberto, marque Pendente para o financeiro cobrar depois.
             </p>
-          </div>
+          </div></>}
 
           <div className="space-y-2">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Escala de dor</Label>
@@ -232,7 +210,7 @@ const EvolutionSheet = ({ open, onOpenChange, appointment, onSuccess }: Props) =
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Notas de evolucao</Label>
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Notas de evolução</Label>
             <Textarea
               placeholder="Exercicios, cargas, amplitude, dor, conduta e resposta do paciente"
               value={evolutionNotes}
@@ -243,7 +221,7 @@ const EvolutionSheet = ({ open, onOpenChange, appointment, onSuccess }: Props) =
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Midia clinica</Label>
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Mídia clínica</Label>
             <label className="relative flex aspect-video cursor-pointer items-center justify-center overflow-hidden rounded-sm border border-dashed border-border bg-secondary/40 transition-colors hover:border-foreground/40">
               {mediaPreview ? (
                 <img src={mediaPreview} alt="Preview clinico" className="h-full w-full object-cover" />

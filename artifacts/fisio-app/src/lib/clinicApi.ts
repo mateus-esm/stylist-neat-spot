@@ -1,3 +1,7 @@
+export interface BookingRequest {
+  id: string; clientName: string; appointmentDate: string; appointmentTime: string; status: string;
+}
+
 export type PortalData = {
   clinicId: string;
   role: string;
@@ -28,6 +32,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const clinicApi = {
+  bookingRequests: (id?: string) => request<BookingRequest[]>(`/clinic/booking-requests${id ? "?id=" + encodeURIComponent(id) : ""}`),
+  reviewBooking: (id: string, decision: "approve" | "decline") => request(`/clinic/booking-requests/${id}`, {
+    method: "POST", body: JSON.stringify({ decision }),
+  }),
   portal: () => request<PortalData>("/clinic/portal"),
   appointment: (id: string) => request<any>(`/clinic/portal/appointments/${id}`),
   updatePatientAppointment: (id: string, body: {
@@ -59,7 +67,7 @@ export const clinicApi = {
   getConsent: (clientId?: string) =>
     request<any>(`/clinic/whatsapp/consent${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ""}`),
   whatsappConfig: () => request<any>("/clinic/whatsapp/config"),
-  updateWhatsappConfig: (body: { enabled?: boolean; reminderHours?: number[]; timezone?: string }) =>
+  updateWhatsappConfig: (body: { enabled?: boolean; managerPhone?: string | null; reminderHours?: number[]; timezone?: string }) =>
     request<any>("/clinic/whatsapp/config", { method: "PATCH", body: JSON.stringify(body) }),
   connectWhatsappInstance: () =>
     request<any>("/clinic/whatsapp/instance/connect", { method: "POST" }),

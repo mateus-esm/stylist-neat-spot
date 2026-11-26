@@ -186,6 +186,8 @@ export interface WhatsappConfig {
 }
 
 export interface WhatsappConfigUpdate {
+  /** @nullable */
+  managerPhone?: string | null;
   enabled?: boolean;
   /**
      * @items.minimum 1
@@ -365,6 +367,37 @@ export interface AppointmentMediaInput {
 export type AcceptClinicMemberInvitation200 = { [key: string]: unknown };
 
 export type ListClinicAuditEvents200Item = { [key: string]: unknown };
+
+export type ListBookingRequestsParams = {
+/**
+ * Appointment UUID
+ */
+id?: string;
+};
+
+export type ListBookingRequests200Item = {
+  id: string;
+  clientName: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  status: string;
+};
+
+export type ReviewBookingRequestBodyDecision = typeof ReviewBookingRequestBodyDecision[keyof typeof ReviewBookingRequestBodyDecision];
+
+
+export const ReviewBookingRequestBodyDecision = {
+  approve: 'approve',
+  decline: 'decline',
+} as const;
+
+export type ReviewBookingRequestBody = {
+  decision: ReviewBookingRequestBodyDecision;
+};
+
+export type ReviewBookingRequest200 = {
+  id: string;
+};
 
 export type GetPortalAppointment200 = { [key: string]: unknown };
 

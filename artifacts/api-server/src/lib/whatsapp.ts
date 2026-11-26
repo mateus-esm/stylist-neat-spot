@@ -45,13 +45,13 @@ const DEFAULT_TEMPLATES: Array<{
     key: "appointment_confirmation",
     eventType: "appointment_confirmation",
     label: "Confirmação de agendamento",
-    body: "Olá, {{patientName}}! Sua sessão na {{clinicName}} está agendada para {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. Veja os detalhes no aplicativo: {{confirmationLink}}",
+    body: "Olá, {{patientName}}! Sua sessão na {{clinicName}} está agendada para {{appointmentDate}} às {{appointmentTime}}. Confirme sua presença no aplicativo: {{confirmationLink}}",
   },
   {
     key: "appointment_reminder",
     eventType: "appointment_reminder",
     label: "Lembrete de sessão",
-    body: "Olá, {{patientName}}! Lembrete da sua sessão na {{clinicName}}: {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. Confirme ou peça alteração pelo aplicativo: {{confirmationLink}}",
+    body: "Olá, {{patientName}}! Sua sessão na {{clinicName}} será em {{appointmentDate}} às {{appointmentTime}}. Abra o aplicativo para confirmar ou consultar seu horário: {{confirmationLink}}",
   },
   {
     key: "reschedule",
@@ -64,8 +64,8 @@ const DEFAULT_TEMPLATES: Array<{
 // Bodies shipped before the app link was added; rows still holding one of these are upgraded.
 const LEGACY_TEMPLATE_BODIES: Record<string, string[]> = {
   invite: ["Olá, {{patientName}}. A {{clinicName}} enviou um convite para você acompanhar seus agendamentos. {{inviteLink}}"],
-  appointment_confirmation: ["Olá, {{patientName}}. Sua sessão na {{clinicName}} está marcada para {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. {{confirmationLink}}"],
-  appointment_reminder: ["Lembrete, {{patientName}}: sua sessão na {{clinicName}} será em {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. {{confirmationLink}}"],
+  appointment_confirmation: ["Olá, {{patientName}}! Sua sessão na {{clinicName}} está agendada para {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. Veja os detalhes no aplicativo: {{confirmationLink}}", "Olá, {{patientName}}. Sua sessão na {{clinicName}} está marcada para {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. {{confirmationLink}}"],
+  appointment_reminder: ["Olá, {{patientName}}! Lembrete da sua sessão na {{clinicName}}: {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. Confirme ou peça alteração pelo aplicativo: {{confirmationLink}}", "Lembrete, {{patientName}}: sua sessão na {{clinicName}} será em {{appointmentDate}} às {{appointmentTime}}. Serviço: {{service}}. {{confirmationLink}}"],
   reschedule: ["Olá, {{patientName}}. Recebemos seu pedido de reagendamento na {{clinicName}}. Consulte as opções seguras no portal: {{confirmationLink}}"],
 };
 
@@ -137,9 +137,11 @@ export function isWhatsappAsyncEnabled() {
   return process.env.WHATSMIAU_ASYNC_ENABLED?.trim().toLowerCase() === "true";
 }
 
-export async function ensureWhatsappTemplates(clinicId: string) {
+type Executor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+export async function ensureWhatsappTemplates(clinicId: string, executor: Executor = db) {
   for (const template of DEFAULT_TEMPLATES) {
-    await db.insert(whatsappTemplatesTable).values({
+    await executor.insert(whatsappTemplatesTable).values({
       clinicId,
       key: template.key,
       eventType: template.eventType,
@@ -152,7 +154,7 @@ export async function ensureWhatsappTemplates(clinicId: string) {
       target: [whatsappTemplatesTable.clinicId, whatsappTemplatesTable.key],
     });
     for (const legacy of LEGACY_TEMPLATE_BODIES[template.key] ?? []) {
-      await db.update(whatsappTemplatesTable).set({ body: template.body }).where(and(
+      await executor.update(whatsappTemplatesTable).set({ body: template.body }).where(and(
         eq(whatsappTemplatesTable.clinicId, clinicId),
         eq(whatsappTemplatesTable.key, template.key),
         eq(whatsappTemplatesTable.body, legacy),
@@ -165,13 +167,14 @@ export async function getWhatsappConfig(clinicId: string) {
   let [settings] = await db.select().from(whatsappSettingsTable)
     .where(eq(whatsappSettingsTable.clinicId, clinicId)).limit(1);
   if (!settings) {
-    [settings] = await db.insert(whatsappSettingsTable).values({ clinicId }).returning();
+    await db.insert(whatsappSettingsTable).values({ clinicId }).onConflictDoNothing();
+    [settings] = await db.select().from(whatsappSettingsTable).where(eq(whatsappSettingsTable.clinicId, clinicId));
   }
   const instanceName = settings.instanceName ?? process.env.WHATSMIAU_INSTANCE_NAME ?? null;
   return {
     settings,
     provider: {
-      configured: Boolean(process.env.WHATSMIAU_API_TOKEN && instanceName),
+      configured: Boolean(process.env.WHATSMIAU_BASE_URL && process.env.WHATSMIAU_API_TOKEN && instanceName),
       baseUrlConfigured: Boolean(process.env.WHATSMIAU_BASE_URL),
       tokenConfigured: Boolean(process.env.WHATSMIAU_API_TOKEN),
       instanceConfigured: Boolean(instanceName),
@@ -198,14 +201,14 @@ type EnqueueInput = {
   skipConsent?: boolean;
 };
 
-export async function enqueueWhatsappEvent(input: EnqueueInput) {
-  await ensureWhatsappTemplates(input.clinicId);
-  const [client] = await db.select({ name: clientsTable.name, phone: clientsTable.phone })
+export async function enqueueWhatsappEvent(input: EnqueueInput, executor: Executor = db) {
+  await ensureWhatsappTemplates(input.clinicId, executor);
+  const [client] = await executor.select({ name: clientsTable.name, phone: clientsTable.phone })
     .from(clientsTable).where(and(
       eq(clientsTable.id, input.clientId),
       or(eq(clientsTable.clinicId, input.clinicId), isNull(clientsTable.clinicId)),
     )).limit(1);
-  const [consent] = await db.select({ optedIn: whatsappConsentsTable.optedIn, phone: whatsappConsentsTable.phone })
+  const [consent] = await executor.select({ optedIn: whatsappConsentsTable.optedIn, phone: whatsappConsentsTable.phone })
     .from(whatsappConsentsTable).where(and(
       eq(whatsappConsentsTable.clinicId, input.clinicId),
       eq(whatsappConsentsTable.clientId, input.clientId),
@@ -213,9 +216,9 @@ export async function enqueueWhatsappEvent(input: EnqueueInput) {
   const phone = cleanValue(consent?.phone ?? client?.phone);
   if (!client || !phone || (!input.skipConsent && !consent?.optedIn)) return null;
 
-  const [clinic] = await db.select({ name: clinicsTable.name }).from(clinicsTable)
+  const [clinic] = await executor.select({ name: clinicsTable.name }).from(clinicsTable)
     .where(eq(clinicsTable.id, input.clinicId)).limit(1);
-  const [template] = await db.select().from(whatsappTemplatesTable).where(and(
+  const [template] = await executor.select().from(whatsappTemplatesTable).where(and(
     eq(whatsappTemplatesTable.clinicId, input.clinicId),
     eq(whatsappTemplatesTable.eventType, input.eventType),
     eq(whatsappTemplatesTable.active, true),
@@ -226,7 +229,7 @@ export async function enqueueWhatsappEvent(input: EnqueueInput) {
   let appointmentValues: Record<string, unknown> = {};
   const appointmentId = typeof input.values?.appointmentId === "string" ? input.values.appointmentId : undefined;
   if (appointmentId && input.eventType !== "invite") {
-    const [appointment] = await db.select({
+    const [appointment] = await executor.select({
       appointmentDate: appointmentsTable.appointmentDate,
       appointmentTime: appointmentsTable.appointmentTime,
       service: appointmentsTable.service,
@@ -236,7 +239,7 @@ export async function enqueueWhatsappEvent(input: EnqueueInput) {
     )).limit(1);
     if (appointment) {
       appointmentValues = {
-        appointmentDate: appointment.appointmentDate,
+        appointmentDate: appointment.appointmentDate.split("-").reverse().join("/"),
         appointmentTime: appointment.appointmentTime.slice(0, 5),
         service: appointment.service,
         confirmationLink: appLink(`/meu-app/agenda/${appointmentId}`),
@@ -252,7 +255,7 @@ export async function enqueueWhatsappEvent(input: EnqueueInput) {
     clinicName: clinic?.name ?? "sua clínica",
   };
   const fallbackText = renderWhatsappTemplate(template.body, values);
-  const [row] = await db.insert(whatsappOutboxTable).values({
+  const [row] = await executor.insert(whatsappOutboxTable).values({
     clinicId: input.clinicId,
     clientId: input.clientId,
     eventType: input.eventType,
@@ -271,7 +274,7 @@ export async function enqueueWhatsappEvent(input: EnqueueInput) {
     target: [whatsappOutboxTable.clinicId, whatsappOutboxTable.idempotencyKey],
   }).returning();
   if (row) return row;
-  const [existing] = await db.select().from(whatsappOutboxTable).where(and(
+  const [existing] = await executor.select().from(whatsappOutboxTable).where(and(
     eq(whatsappOutboxTable.clinicId, input.clinicId),
     eq(whatsappOutboxTable.idempotencyKey, input.idempotencyKey),
   )).limit(1);
@@ -283,8 +286,9 @@ export async function enqueueAppointmentEvent(
   appointmentId: string,
   eventType: Exclude<WhatsappEventType, "invite">,
   suffix: string = eventType,
+  executor: Executor = db,
 ) {
-  const [appointment] = await db.select({
+  const [appointment] = await executor.select({
     id: appointmentsTable.id,
     clientId: appointmentsTable.clientId,
     appointmentDate: appointmentsTable.appointmentDate,
@@ -295,21 +299,23 @@ export async function enqueueAppointmentEvent(
     eq(appointmentsTable.clinicId, clinicId),
   )).limit(1);
   if (!appointment?.clientId) return null;
+  const [settings] = await executor.select().from(whatsappSettingsTable).where(eq(whatsappSettingsTable.clinicId, clinicId));
+  if (!settings?.enabled) return null;
   return enqueueWhatsappEvent({
     clinicId,
     clientId: appointment.clientId,
     eventType,
     idempotencyKey: `${eventType}:${appointment.id}:${suffix}`,
     values: {
-      appointmentDate: appointment.appointmentDate,
+      appointmentDate: appointment.appointmentDate.split("-").reverse().join("/"),
       appointmentTime: appointment.appointmentTime.slice(0, 5),
       service: appointment.service,
       confirmationLink: appLink(`/meu-app/agenda/${appointment.id}`),
     },
-  });
+  }, executor);
 }
 
-function appointmentDateInTimezone(date: string, time: string, timezone: string) {
+export function appointmentDateInTimezone(date: string, time: string, timezone: string) {
   const [year, month, day] = date.split("-").map(Number);
   const [hour, minute] = time.split(":").map(Number);
   const guess = Date.UTC(year, month - 1, day, hour, minute);
@@ -323,6 +329,33 @@ function appointmentDateInTimezone(date: string, time: string, timezone: string)
   return new Date(guess - (asUtc - guess));
 }
 
+export async function enqueueBookingAlert(tx: Executor, clinicId: string, appointmentId: string, day: string) {
+  const [settings] = await tx.select().from(whatsappSettingsTable).where(eq(whatsappSettingsTable.clinicId, clinicId));
+  if (!settings?.enabled || !settings.managerPhone) return;
+  const link = appLink(`/?solicitacao=${appointmentId}&dia=${day}`);
+  await tx.insert(whatsappOutboxTable).values({
+    clinicId, phone: settings.managerPhone, eventType: "booking_request",
+    idempotencyKey: `booking_request:${appointmentId}`,
+    fallbackText: `Novo pedido de sessão na agenda. Abra o aplicativo para avaliar o horário: ${link}`,
+    payload: { appointmentId },
+  }).onConflictDoNothing();
+}
+
+export async function enqueueBookingDeclined(tx: Executor, clinicId: string, clientId: string, appointmentId: string) {
+  const [recipient] = await tx.select({ phone: whatsappConsentsTable.phone, fallbackPhone: clientsTable.phone })
+    .from(whatsappConsentsTable)
+    .innerJoin(clientsTable, eq(clientsTable.id, whatsappConsentsTable.clientId))
+    .innerJoin(whatsappSettingsTable, eq(whatsappSettingsTable.clinicId, whatsappConsentsTable.clinicId))
+    .where(and(eq(whatsappConsentsTable.clinicId, clinicId), eq(whatsappConsentsTable.clientId, clientId),
+      eq(whatsappConsentsTable.optedIn, true), eq(whatsappSettingsTable.enabled, true)));
+  const phone = recipient?.phone || recipient?.fallbackPhone;
+  if (!phone) return;
+  await tx.insert(whatsappOutboxTable).values({
+    clinicId, clientId, phone, eventType: "booking_declined", idempotencyKey: `booking_declined:${appointmentId}`,
+    fallbackText: `A clínica não pôde aprovar o horário solicitado. Escolha outro horário no aplicativo: ${appLink("/meu-app?agendar=1")}`,
+  }).onConflictDoNothing();
+}
+
 export async function enqueueDueWhatsappReminders(now = new Date()) {
   const appointments = await db.select({
     id: appointmentsTable.id,
@@ -331,7 +364,7 @@ export async function enqueueDueWhatsappReminders(now = new Date()) {
     appointmentDate: appointmentsTable.appointmentDate,
     appointmentTime: appointmentsTable.appointmentTime,
     service: appointmentsTable.service,
-  }).from(appointmentsTable).where(inArray(appointmentsTable.status, ["agendado", "solicitado"]));
+  }).from(appointmentsTable).where(inArray(appointmentsTable.status, ["agendado", "confirmado", "presenca_confirmada"]));
   let queued = 0;
   for (const appointment of appointments) {
     if (!appointment.clinicId || !appointment.clientId) continue;
@@ -341,29 +374,16 @@ export async function enqueueDueWhatsappReminders(now = new Date()) {
     const appointmentAt = appointmentDateInTimezone(appointment.appointmentDate, appointment.appointmentTime, settings.timezone);
     for (const hours of settings.reminderHours.filter((value) => Number.isFinite(value) && value > 0 && value <= 168)) {
       const scheduledAt = new Date(appointmentAt.getTime() - hours * 60 * 60 * 1000);
-      if (scheduledAt > now) {
-        await enqueueWhatsappEvent({
-          clinicId: appointment.clinicId,
-          clientId: appointment.clientId,
-          eventType: "appointment_reminder",
-          idempotencyKey: `appointment_reminder:${appointment.id}:${hours}`,
-          values: {
-            appointmentDate: appointment.appointmentDate,
-            appointmentTime: appointment.appointmentTime.slice(0, 5),
-            service: appointment.service,
-            confirmationLink: appLink(`/meu-app/agenda/${appointment.id}`),
-          },
-          scheduledAt,
-        });
-        continue;
-      }
+      // Queue when due. A later schedule change or cancellation should not leave a future reminder behind.
+      if (scheduledAt > now || appointmentAt <= now || now.getTime() - scheduledAt.getTime() > 15 * 60_000) continue;
       const row = await enqueueWhatsappEvent({
         clinicId: appointment.clinicId,
         clientId: appointment.clientId,
         eventType: "appointment_reminder",
-        idempotencyKey: `appointment_reminder:${appointment.id}:${hours}`,
+        idempotencyKey: `appointment_reminder:${appointment.id}:${appointment.appointmentDate}:${appointment.appointmentTime}:${hours}`,
         values: {
-          appointmentDate: appointment.appointmentDate,
+          appointmentId: appointment.id,
+          appointmentDate: appointment.appointmentDate.split("-").reverse().join("/"),
           appointmentTime: appointment.appointmentTime.slice(0, 5),
           service: appointment.service,
           confirmationLink: appLink(`/meu-app/agenda/${appointment.id}`),
@@ -737,6 +757,40 @@ export async function processWhatsappMessage(id: string, clinicId: string) {
 
   const attempt = Number(claimed.attempts) + 1;
   try {
+    const [settings] = await db.select().from(whatsappSettingsTable).where(eq(whatsappSettingsTable.clinicId, clinicId));
+    const controlledTest = claimed.idempotencyKey.startsWith("template_test:") && claimed.templateKey != null;
+    const managerAlert = claimed.eventType === "booking_request";
+    let eligible = controlledTest || !!settings?.enabled;
+    if (eligible && managerAlert) {
+      const [pending] = await db.select({ id: appointmentsTable.id }).from(appointmentsTable).where(and(
+        eq(appointmentsTable.id, String(claimed.payload.appointmentId)), eq(appointmentsTable.clinicId, clinicId),
+        eq(appointmentsTable.status, "solicitado"),
+      ));
+      eligible = !!pending && settings?.managerPhone === claimed.phone;
+    } else if (eligible && !controlledTest) {
+      const [recipient] = claimed.clientId ? await db.select({
+        phone: whatsappConsentsTable.phone, clientPhone: clientsTable.phone, optedIn: whatsappConsentsTable.optedIn,
+      }).from(whatsappConsentsTable).innerJoin(clientsTable, eq(clientsTable.id, whatsappConsentsTable.clientId))
+        .where(and(eq(whatsappConsentsTable.clientId, claimed.clientId), eq(whatsappConsentsTable.clinicId, clinicId))) : [];
+      eligible = !!recipient?.optedIn && normalizeWhatsappPhone(recipient.phone || recipient.clientPhone || "") === normalizeWhatsappPhone(claimed.phone || "");
+      if (eligible && ["appointment_reminder", "appointment_confirmation"].includes(claimed.eventType)) {
+        const match = String(claimed.payload.confirmationLink ?? "").match(/\/meu-app\/agenda\/([0-9a-f-]{36})$/i);
+        if (match) {
+          const [visit] = await db.select().from(appointmentsTable).where(and(eq(appointmentsTable.id, match[1]),
+            eq(appointmentsTable.clinicId, clinicId), eq(appointmentsTable.clientId, claimed.clientId!)));
+          eligible = !!visit && ["agendado", "confirmado", "presenca_confirmada"].includes(visit.status)
+            && appointmentDateInTimezone(visit.appointmentDate, visit.appointmentTime, settings?.timezone || "America/Fortaleza") > now
+            && [visit.appointmentDate, visit.appointmentDate.split("-").reverse().join("/")].includes(String(claimed.payload.appointmentDate))
+            && visit.appointmentTime.slice(0, 5) === claimed.payload.appointmentTime;
+        }
+      }
+    }
+    if (!eligible) {
+      const [cancelled] = await db.update(whatsappOutboxTable).set({ status: "cancelled", lockedAt: null,
+        lockToken: null, nextAttemptAt: null, lastError: null }).where(and(eq(whatsappOutboxTable.id, id),
+          eq(whatsappOutboxTable.lockToken, lockToken))).returning();
+      return cancelled ?? claimed;
+    }
     const delivered = await sendToWhatsmiau(claimed);
     const [sent] = await db.update(whatsappOutboxTable).set({
       status: "sent",
@@ -793,13 +847,19 @@ export async function processWhatsappOutboxBatch(limit = 20) {
   return processed;
 }
 
+export async function runWhatsappWorkerOnce() {
+  if (!isWhatsappAsyncEnabled()) return { enabled: false, reminders: 0, processed: 0 };
+  const reminders = await enqueueDueWhatsappReminders();
+  const processed = await processWhatsappOutboxBatch();
+  return { enabled: true, reminders, processed };
+}
+
 export function startWhatsappWorker() {
   const intervalMs = Number(process.env.WHATSMIAU_WORKER_INTERVAL_MS || 60000);
   const run = async () => {
     if (!isWhatsappAsyncEnabled()) return;
     try {
-      await enqueueDueWhatsappReminders();
-      await processWhatsappOutboxBatch();
+      await runWhatsappWorkerOnce();
     } catch (error) {
       logger.error({ err: error }, "WhatsApp worker run failed");
     }

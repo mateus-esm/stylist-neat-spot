@@ -4,9 +4,10 @@ import { vi } from "vitest";
  * The integration suite must never use the developer database by accident.
  * CI/local runs provide a disposable database through this dedicated name.
  */
-if (process.env.CLINIC_TEST_DATABASE_URL) {
-  process.env.DATABASE_URL = process.env.CLINIC_TEST_DATABASE_URL;
+if (!process.env.CLINIC_TEST_DATABASE_URL?.trim()) {
+  throw new Error("Defina CLINIC_TEST_DATABASE_URL para um banco descartável antes de executar os testes.");
 }
+process.env.DATABASE_URL = process.env.CLINIC_TEST_DATABASE_URL;
 
 vi.mock("@clerk/express", () => ({
   clerkMiddleware: () => (_req: unknown, _res: unknown, next: () => void) => next(),

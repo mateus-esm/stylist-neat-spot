@@ -1,3 +1,4 @@
+import { localReturnPath } from "@/lib/authRedirect";
 import { SignIn, SignUp } from "@clerk/react";
 import { BrandLogo, SoloVenturesBadge } from "@/components/BrandLogo";
 import { useLocation, useSearchParams } from "react-router-dom";
@@ -11,7 +12,7 @@ const Auth = () => {
   const { theme } = useTheme();
   
   const [isSignUp, setIsSignUp] = useState(false);
-  const redirect = params.get("redirect") || "/meu-app";
+  const redirect = localReturnPath(params.get("redirect"), "/");
   
   useEffect(() => {
     setIsSignUp(location.pathname.startsWith("/sign-up"));
@@ -35,7 +36,7 @@ const Auth = () => {
             <SignUp
               routing="path"
               path="/sign-up"
-              signInUrl="/sign-in"
+              signInUrl={`/sign-in?redirect=${encodeURIComponent(redirect)}`}
               fallbackRedirectUrl={redirect}
               appearance={{
                 theme: theme === "dark" ? dark : undefined,
@@ -61,7 +62,7 @@ const Auth = () => {
             <SignIn
               routing="path"
               path="/sign-in"
-              signUpUrl="/sign-up"
+              signUpUrl={`/sign-up?redirect=${encodeURIComponent(redirect)}`}
                 fallbackRedirectUrl={redirect}
               appearance={{
                 theme: theme === "dark" ? dark : undefined,

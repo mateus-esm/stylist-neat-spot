@@ -20,6 +20,7 @@ export const whatsappSettingsTable = pgTable("whatsapp_settings", {
   timezone: text("timezone").notNull().default("America/Sao_Paulo"),
   instanceName: text("instance_name"),
   connectionStatus: text("connection_status").notNull().default("not_configured"),
+  managerPhone: text("manager_phone"),
   connectedPhone: text("connected_phone"),
   lastProviderSyncAt: timestamp("last_provider_sync_at", { withTimezone: true }),
   updatedBy: text("updated_by"),

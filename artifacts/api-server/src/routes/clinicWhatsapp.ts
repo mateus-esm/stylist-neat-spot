@@ -32,6 +32,7 @@ import {
   processWhatsappMessage,
   previewValues,
   recordWhatsmiauDelivery,
+  runWhatsappWorkerOnce,
   renderWhatsappTemplate,
   WHATSAPP_VARIABLES,
 } from "../lib/whatsapp";
@@ -66,6 +67,16 @@ router.post("/webhooks/whatsmiau", async (req: Request, res: Response): Promise<
   res.status(200).json(result);
 });
 
+// An external scheduler can wake an autoscaled instance even when nobody has the app open.
+router.post("/jobs/whatsapp", async (req, res) => {
+  const secret = process.env.WHATSMIAU_JOB_TOKEN?.trim();
+  if (!secret) return res.sendStatus(404);
+  const provided = Buffer.from(req.get("authorization") ?? "");
+  const expected = Buffer.from(`Bearer ${secret}`);
+  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return res.sendStatus(401);
+  return res.json(await runWhatsappWorkerOnce());
+});
+
 router.use(requireClinicAuth);
 
 const ConsentBody = z.object({
@@ -83,6 +94,9 @@ const OutboxBody = z.object({
   templateKey: z.string().min(1).max(80).optional(),
 });
 const SettingsBody = z.object({
+  managerPhone: z.string().trim().transform((value) => value.replace(/[\s()+-]/g, ""))
+    .refine((value) => !value || /^[1-9]\d{9,14}$/.test(value), "Informe o telefone com código do país e DDD.")
+    .transform((value) => value || null).nullable().optional(),
   enabled: z.boolean().optional(),
   reminderHours: z.array(z.number().int().min(1).max(168))
     .min(1).max(7)
@@ -452,11 +466,9 @@ router.get("/clinic/whatsapp/consent", async (req: Request, res: Response): Prom
     return;
   }
   const client = context.role === "patient"
-    ? await ownedClient(clientId, context.clinicId, userId)
-    : (await db.select().from(clientsTable).where(and(
-      eq(clientsTable.id, clientId), eq(clientsTable.userId, userId),
-      or(eq(clientsTable.clinicId, context.clinicId), isNull(clientsTable.clinicId)),
-    )).limit(1))[0];
+    ? (await db.select().from(clientsTable).where(and(eq(clientsTable.id, clientId),
+      eq(clientsTable.authUserId, userId), or(eq(clientsTable.clinicId, context.clinicId), isNull(clientsTable.clinicId)))))[0]
+    : await ownedClient(clientId, context.clinicId, userId);
   if (!client) {
     res.status(404).json({ error: "Paciente não encontrado" });
     return;
@@ -497,6 +509,10 @@ router.post("/clinic/whatsapp/consent", async (req: Request, res: Response): Pro
     : await ownedClient(clientId, context.clinicId, userId);
   if (!client) {
     res.status(404).json({ error: "Paciente não encontrado" });
+    return;
+  }
+  if (parsed.data.optedIn && !(parsed.data.phone || client.phone)?.replace(/\D/g, "")) {
+    res.status(400).json({ error: "Peça à clínica para cadastrar seu telefone antes de ativar os lembretes." });
     return;
   }
   const now = new Date();
@@ -545,10 +561,18 @@ router.post("/clinic/whatsapp/outbox", async (req: Request, res: Response): Prom
     return;
   }
   try {
-    const [existing] = await db.select({ id: whatsappOutboxTable.id }).from(whatsappOutboxTable).where(and(
+    const [existing] = await db.select().from(whatsappOutboxTable).where(and(
       eq(whatsappOutboxTable.clinicId, admin.clinicId),
       eq(whatsappOutboxTable.idempotencyKey, parsed.data.idempotencyKey),
     )).limit(1);
+    if (existing) {
+      if (existing.clientId !== parsed.data.clientId || existing.eventType !== parsed.data.eventType) {
+        res.status(409).json({ error: "Chave já utilizada para outra mensagem." });
+        return;
+      }
+      res.json(existing);
+      return;
+    }
     const row = await enqueueWhatsappEvent({
       clinicId: admin.clinicId,
       clientId: parsed.data.clientId,
@@ -562,7 +586,7 @@ router.post("/clinic/whatsapp/outbox", async (req: Request, res: Response): Prom
       res.status(409).json({ error: "Paciente não autorizou mensagens WhatsApp ou não possui telefone" });
       return;
     }
-    res.status(existing ? 200 : 201).json(row);
+    res.status(201).json(row);
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : "Não foi possível enfileirar a mensagem" });
   }

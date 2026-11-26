@@ -40,6 +40,7 @@ type Template = {
 };
 
 type WhatsappConfig = {
+  managerPhone?: string | null;
   enabled?: boolean;
   reminderHours?: number[];
   reminder_hours?: number[];
@@ -47,7 +48,7 @@ type WhatsappConfig = {
   instanceName?: string | null;
   connectionStatus?: string;
   connectedPhone?: string | null;
-  provider?: string | { configured?: boolean; baseUrlConfigured?: boolean; tokenConfigured?: boolean; instanceName?: string | null; sendPath?: string; status?: string };
+  provider?: string | { configured?: boolean; baseUrlConfigured?: boolean; tokenConfigured?: boolean; instanceName?: string | null; asyncEnabled?: boolean; sendPath?: string; status?: string };
   settings?: { enabled?: boolean; reminderHours?: number[]; timezone?: string; instanceName?: string | null; connectionStatus?: string; connectedPhone?: string | null };
   providerStatus?: string;
   provider_status?: string;
@@ -122,12 +123,14 @@ const statusLabel = (status?: string) => {
     sent: "Enviado",
     delivered: "Entregue",
     failed: "Falhou",
-    retry_wait: "Aguardando retry",
-    fallback_required: "Fallback necessário",
+    retry_wait: "Nova tentativa agendada",
+    fallback_required: "Precisa de atenção",
     cancelled: "Cancelado",
   };
   return labels[status ?? ""] ?? status ?? "Sem status";
 };
+
+const outboxLabels: Record<string, string> = { ...eventLabels, booking_request: "Novo pedido para o gestor", booking_declined: "Pedido recusado" };
 
 const statusTone = (status?: string) => {
   if (status === "sent" || status === "delivered") return "border-success/30 bg-success/10 text-success";
@@ -158,6 +161,7 @@ const WhatsappSettings = () => {
     body: "",
   });
   const [configForm, setConfigForm] = useState({
+    managerPhone: "",
     enabled: false,
     reminderHours: [] as number[],
     timezone: "America/Sao_Paulo",
@@ -188,6 +192,7 @@ const WhatsappSettings = () => {
         phoneNumber: nextConfig.connectedPhone ?? nextConfig.settings?.connectedPhone ?? nextConfig.phoneNumber ?? nextConfig.phone_number ?? null,
       });
       setConfigForm({
+        managerPhone: nextConfig.managerPhone ?? "",
         enabled: Boolean(nextConfig.enabled),
         reminderHours: nextHours.map(Number).filter((hour) => reminderOptions.includes(hour)),
         timezone: nextConfig.timezone ?? "America/Sao_Paulo",
@@ -539,13 +544,20 @@ const WhatsappSettings = () => {
         </CardHeader>
         <CardContent className="p-4 sm:p-5">
           <form onSubmit={updateConfig} className="space-y-5">
+            {configForm.enabled && typeof config?.provider === "object" && !config.provider.asyncEnabled && <p role="status" className="rounded-md border p-3 text-sm">O envio automático está pausado no servidor. Os avisos ficam na fila até a ativação do processamento.</p>}
+            <div className="space-y-2">
+              <Label htmlFor="manager-phone">WhatsApp do gestor</Label>
+              <Input id="manager-phone" type="tel" placeholder="+55 85 99999-9999" value={configForm.managerPhone}
+                onChange={(event) => setConfigForm((current) => ({ ...current, managerPhone: event.target.value }))} />
+              <p className="text-xs text-muted-foreground">Com a automação ativa, este número recebe o link para avaliar cada novo pedido de sessão.</p>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-sm border border-border bg-background p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex gap-3">
                     <BellRing className="mt-0.5 h-4 w-4 text-primary" />
                     <div>
-                      <Label htmlFor="whatsapp-enabled" className="cursor-pointer text-sm font-semibold">Enviar lembretes</Label>
+                      <Label htmlFor="whatsapp-enabled" className="cursor-pointer text-sm font-semibold">Ativar notificações pelo WhatsApp</Label>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">O servidor valida consentimento antes de enfileirar qualquer mensagem.</p>
                     </div>
                   </div>
@@ -838,7 +850,7 @@ const WhatsappSettings = () => {
                     <div className="flex min-w-0 items-start gap-3">
                       <span className="font-mono-data pt-0.5 text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</span>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{itemEventType ? (eventLabels[itemEventType as WhatsappEventType] ?? itemEventType) : "Mensagem operacional"}</p>
+                        <p className="truncate text-sm font-medium">{itemEventType ? (outboxLabels[itemEventType] ?? itemEventType) : "Mensagem operacional"}</p>
                         <p className="mt-1 text-xs text-muted-foreground">Criado em {formatDate(item.createdAt ?? item.created_at)}{(item.scheduledAt ?? item.scheduled_for) ? ` · agendado para ${formatDate(item.scheduledAt ?? item.scheduled_for)}` : ""}</p>
                         {(item.error ?? item.lastError ?? item.last_error) && <p className="mt-1 text-xs text-destructive">{item.error ?? item.lastError ?? item.last_error}</p>}
                         {(item.nextAttemptAt ?? item.next_attempt_at) && status === "retry_wait" && <p className="mt-1 text-xs text-muted-foreground">Próxima tentativa: {formatDate(item.nextAttemptAt ?? item.next_attempt_at)}</p>}
